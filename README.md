@@ -1,70 +1,107 @@
-# Getting Started with Create React App
+# Satori Lab Tests Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A modern React application for displaying laboratory test services, categories, and pricing information.
 
-## Available Scripts
+## Features
 
-In the project directory, you can run:
+- 🧪 **Service Categories**: Browse different lab service categories
+- 📊 **Test Details**: View individual tests within each category
+- ⏱️ **Turnaround Times**: See pricing for different turnaround options
+- 💰 **Dynamic Pricing**: Color-coded pricing based on urgency
+- 📱 **Responsive Design**: Works on desktop and mobile devices
+- 🎨 **Modern UI**: Beautiful gradient design with smooth animations
 
-### `npm start`
+## Getting Started
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### Prerequisites
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- Node.js (v14 or higher)
+- npm or yarn
+- Backend API running on http://localhost:8000
 
-### `npm test`
+### Installation
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+1. Install dependencies:
+```bash
+npm install
+```
 
-### `npm run build`
+2. Start the development server:
+```bash
+npm start
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+3. Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Environment Configuration
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+The app uses the following environment variables:
 
-### `npm run eject`
+- `REACT_APP_API_URL`: Backend API URL (default: http://localhost:8000)
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## Project Structure
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```
+src/
+├── components/
+│   ├── LabTests.js          # Main lab tests component
+│   └── LabTests.css         # Styles for lab tests
+├── services/
+│   └── api.js               # API service for backend communication
+├── App.js                   # Main app component
+├── App.css                  # Global styles
+└── index.js                 # App entry point
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## API Integration
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+The frontend communicates with the backend through the following endpoints:
 
-## Learn More
+- `GET /lab-fees/` - Fetch all lab fees data (categories, tests, rates)
+- `POST /lab-fees/seed` - Seed sample data
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## Features Overview
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+### Service Categories
+- PCM Air Analysis Services
+- TEM Air
+- PLM - Bulk Building Materials
 
-### Code Splitting
+### Test Types
+- NIOSH 7400
+- AHERA (40 CFR, Part 763)
+- EPA Level II
+- NIOSH 7402
+- EPA/600/R-93/116 variants
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+### Turnaround Times
+- 3 hr (Urgent - Red)
+- 6 hr (Same Day - Orange)
+- 24 hr (Next Day - Yellow)
+- 48 hr, 72 hr, 96 hr, 1 Wk (Standard - Green)
 
-### Analyzing the Bundle Size
+## Styling
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+The application uses:
+- CSS Grid and Flexbox for layouts
+- CSS Custom Properties for theming
+- Smooth transitions and hover effects
+- Responsive design patterns
+- Modern gradient backgrounds
 
-### Making a Progressive Web App
+## Development
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+To modify the application:
 
-### Advanced Configuration
+1. Edit components in `src/components/`
+2. Update styles in corresponding `.css` files
+3. Modify API calls in `src/services/api.js`
+4. Test changes in the browser (hot reload enabled)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+## Build for Production
 
-### Deployment
+```bash
+npm run build
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+This creates an optimized build in the `build/` folder.
