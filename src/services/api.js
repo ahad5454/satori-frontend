@@ -155,4 +155,59 @@ export const labFeesAPI = {
   },
 };
 
+export const hrsEstimatorAPI = {
+  // Create new estimation
+  createEstimation: async (estimationData) => {
+    try {
+      console.log('Creating estimation:', estimationData);
+      const response = await api.post('/hrs-estimator/estimate', estimationData);
+      console.log('Create estimation response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating estimation:', error);
+      console.error('Error response:', error.response);
+      throw error;
+    }
+  },
+
+  // Get estimation by ID
+  getEstimation: async (id) => {
+    try {
+      console.log('Fetching estimation:', id);
+      const response = await api.get(`/hrs-estimator/estimate/${id}`);
+      console.log('Get estimation response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching estimation:', error);
+      throw error;
+    }
+  },
+
+  // Get all estimations
+  getEstimations: async () => {
+    try {
+      console.log('Fetching all estimations');
+      const response = await api.get('/hrs-estimator/estimates');
+      console.log('Get estimations response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching estimations:', error);
+      throw error;
+    }
+  },
+
+  // Seed reference data
+  seedData: async () => {
+    try {
+      console.log('Seeding HRS Estimator data');
+      const response = await api.post('/hrs-estimator/seed');
+      console.log('Seed API response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error seeding data:', error);
+      throw error;
+    }
+  },
+};
+
 export default api;

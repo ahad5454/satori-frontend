@@ -407,6 +407,7 @@
   align-items: center;
   gap: 10px;
   font-weight: 500;
+  flex-wrap: wrap;
 }
 
 .turn-time-indicator {
@@ -414,11 +415,35 @@
   height: 12px;
   border-radius: 50%;
   display: inline-block;
+  flex-shrink: 0;
+}
+
+.turn-time-label {
+  flex-shrink: 0;
+}
+
+.rate-sample-count {
+  font-size: 0.85rem;
+  color: #7f8c8d;
+  font-weight: normal;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
+.pricing-row.selected .rate-sample-count {
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .hours {
   text-align: center;
   color: #7f8c8d;
+}
+
+.price-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
 }
 
 .price {
@@ -428,6 +453,15 @@
   font-size: 1.1rem;
 }
 
+.rate-total-cost {
+  text-align: right;
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  font-weight: normal;
+  margin-top: 4px;
+  line-height: 1.2;
+}
+
 .total-cost {
   text-align: right;
   font-weight: bold;
@@ -435,6 +469,158 @@
   font-size: 1.1rem;
 }
 
+
+/* Order Summary - Based on sample_count */
+.order-summary-container {
+  max-width: 1400px;
+  margin: 30px auto 0;
+  padding: 0 20px;
+}
+
+.order-summary-card {
+  background: white;
+  border-radius: 15px;
+  padding: 25px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.order-summary-card h3 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+  text-align: center;
+  font-size: 1.5rem;
+  border-bottom: 3px solid #3498db;
+  padding-bottom: 10px;
+}
+
+.order-summary-details {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.order-summary-breakdown {
+  margin-bottom: 10px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.breakdown-title {
+  color: #2c3e50;
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin-bottom: 15px;
+  text-align: left;
+}
+
+.breakdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  margin-bottom: 10px;
+  transition: all 0.3s ease;
+}
+
+.breakdown-item:hover {
+  background: #e9ecef;
+  transform: translateX(3px);
+}
+
+.breakdown-test-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.breakdown-test-name {
+  color: #2c3e50;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.breakdown-turn-time {
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  font-weight: normal;
+}
+
+.breakdown-values {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  text-align: right;
+}
+
+.breakdown-samples {
+  color: #7f8c8d;
+  font-size: 0.9rem;
+}
+
+.breakdown-cost {
+  color: #27ae60;
+  font-weight: bold;
+  font-size: 1rem;
+}
+
+.order-summary-totals {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-top: 10px;
+}
+
+.order-summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  transition: all 0.3s ease;
+}
+
+.order-summary-item:hover {
+  background: #e9ecef;
+  transform: translateX(5px);
+}
+
+.order-summary-item.highlight {
+  background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+  border-color: #4caf50;
+  border-width: 2px;
+}
+
+.order-summary-label {
+  color: #2c3e50;
+  font-weight: 500;
+  font-size: 1.1rem;
+}
+
+.order-summary-value {
+  color: #2c3e50;
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+.order-summary-total {
+  color: #27ae60;
+  font-size: 1.5rem;
+}
+
+.order-summary-item.highlight .order-summary-label {
+  color: #2e7d32;
+}
+
+.order-summary-item.highlight .order-summary-value {
+  color: #2e7d32;
+}
 
 /* Total Cost Summary */
 .total-cost-summary {
@@ -819,7 +1005,12 @@
     justify-content: center;
   }
   
+  .price-container {
+    align-items: center;
+  }
+
   .price,
+  .rate-total-cost,
   .total-cost {
     text-align: center;
   }
@@ -866,6 +1057,47 @@
 
   .nav-title h1 {
     font-size: 1.5rem;
+  }
+
+  .order-summary-details {
+    gap: 15px;
+  }
+
+  .order-summary-breakdown {
+    padding-bottom: 15px;
+  }
+
+  .breakdown-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .breakdown-test-info {
+    width: 100%;
+  }
+
+  .breakdown-values {
+    align-items: flex-start;
+    width: 100%;
+    text-align: left;
+  }
+
+  .order-summary-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px 15px;
+  }
+
+  .order-summary-label,
+  .order-summary-value {
+    font-size: 1rem;
+  }
+
+  .order-summary-total {
+    font-size: 1.3rem;
   }
 }
 

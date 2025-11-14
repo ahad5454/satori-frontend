@@ -23,6 +23,22 @@ const LabTests = () => {
     fetchLabs();
   }, []);
 
+  // Listen for HRS estimation completion to refresh lab fees data
+  useEffect(() => {
+    const handleHrsEstimationComplete = () => {
+      console.log('HRS Estimation completed, refreshing lab fees data...');
+      if (selectedLab) {
+        fetchCategoriesForLab(selectedLab.id);
+      }
+    };
+    
+    window.addEventListener('hrs-estimation-complete', handleHrsEstimationComplete);
+    
+    return () => {
+      window.removeEventListener('hrs-estimation-complete', handleHrsEstimationComplete);
+    };
+  }, [selectedLab]);
+
   // Fetch categories when lab is selected
   useEffect(() => {
     if (selectedLab) {
@@ -72,7 +88,8 @@ const LabTests = () => {
                 rates: rates.map(rate => ({
                   ...rate,
                   turn_time: rate.turn_time.label,
-                  hours: rate.turn_time.hours
+                  hours: rate.turn_time.hours,
+                  sample_count: rate.sample_count || null // Preserve sample_count from API
                 }))
               };
             })
@@ -182,6 +199,45 @@ const LabTests = () => {
       }
     });
     return total;
+  };
+
+  // Calculate totals from sample_count across all categories and tests
+  const calculateOrderSummary = () => {
+    let totalSamples = 0;
+    let totalCost = 0;
+    const breakdown = [];
+
+    if (categories && categories.length > 0) {
+      categories.forEach(category => {
+        if (category.tests && category.tests.length > 0) {
+          category.tests.forEach(test => {
+            if (test.rates && test.rates.length > 0) {
+              test.rates.forEach(rate => {
+                const sampleCount = rate.sample_count || 0;
+                if (sampleCount > 0) {
+                  const turnTimeStr = typeof rate.turn_time === 'string' ? rate.turn_time : rate.turn_time?.label || 'unknown';
+                  const rateCost = sampleCount * (rate.price || 0);
+                  
+                  totalSamples += sampleCount;
+                  totalCost += rateCost;
+                  
+                  breakdown.push({
+                    categoryName: category.name,
+                    testName: test.name,
+                    turnTime: turnTimeStr,
+                    sampleCount: sampleCount,
+                    price: rate.price || 0,
+                    cost: rateCost
+                  });
+                }
+              });
+            }
+          });
+        }
+      });
+    }
+
+    return { totalSamples, totalCost, breakdown };
   };
 
   const getQuantityForTurnaround = (testName, turnTime) => {
@@ -425,9 +481,26 @@ const LabTests = () => {
                                 className="turn-time-indicator"
                                 style={{ backgroundColor: getTurnTimeColor(rate.hours) }}
                               ></span>
-                              {turnTimeStr}
+                              <span className="turn-time-label">{turnTimeStr}</span>
+                              {rate.sample_count && rate.sample_count > 0 && (
+                                <span className="rate-sample-count">
+                                  • Samples: {rate.sample_count.toLocaleString('en-US')}
+                                </span>
+                              )}
                             </div>
-                            <div className="price">{formatPrice(rate.price)}</div>
+                            <div className="price-container">
+                              <div className="price">{formatPrice(rate.price)}</div>
+                              {rate.sample_count && rate.sample_count > 0 ? (
+                                <div className="rate-total-cost">
+                                  ${(rate.sample_count * rate.price).toLocaleString('en-US', { 
+                                    minimumFractionDigits: 2, 
+                                    maximumFractionDigits: 2 
+                                  })}
+                                </div>
+                              ) : (
+                                <div className="rate-total-cost">$0.00</div>
+                              )}
+                            </div>
                             <div className="total-cost">
                               {quantity > 0 ? formatPrice(totalCost) : '-'}
                             </div>
@@ -481,6 +554,67 @@ const LabTests = () => {
           </div>
         </div>
       )}
+
+      {/* Order Summary - Based on sample_count */}
+      {(() => {
+        const { totalSamples, totalCost, breakdown } = calculateOrderSummary();
+        if (totalSamples > 0 || totalCost > 0) {
+          return (
+            <div className="order-summary-container">
+              <div className="order-summary-card">
+                <h3>🧾 Order Summary</h3>
+                <div className="order-summary-details">
+                  {/* Breakdown by test and turnaround time */}
+                  {breakdown.length > 0 && (
+                    <div className="order-summary-breakdown">
+                      <h4 className="breakdown-title">Breakdown by Test:</h4>
+                      {breakdown.map((item, index) => (
+                        <div key={index} className="breakdown-item">
+                          <div className="breakdown-test-info">
+                            <span className="breakdown-test-name">{item.testName}</span>
+                            <span className="breakdown-turn-time">({item.turnTime})</span>
+                          </div>
+                          <div className="breakdown-values">
+                            <span className="breakdown-samples">
+                              {item.sampleCount.toLocaleString('en-US')} samples
+                            </span>
+                            <span className="breakdown-cost">
+                              ${item.cost.toLocaleString('en-US', { 
+                                minimumFractionDigits: 2, 
+                                maximumFractionDigits: 2 
+                              })}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Totals */}
+                  <div className="order-summary-totals">
+                    <div className="order-summary-item">
+                      <span className="order-summary-label">Total Samples:</span>
+                      <span className="order-summary-value">
+                        {totalSamples.toLocaleString('en-US')}
+                      </span>
+                    </div>
+                    <div className="order-summary-item highlight">
+                      <span className="order-summary-label">Total Cost:</span>
+                      <span className="order-summary-value order-summary-total">
+                        ${totalCost.toLocaleString('en-US', { 
+                          minimumFractionDigits: 2, 
+                          maximumFractionDigits: 2 
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }
+        return null;
+      })()}
 
       {/* Add Category Modal */}
       {showAddCategoryModal && (
