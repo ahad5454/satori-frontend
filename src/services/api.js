@@ -210,4 +210,59 @@ export const hrsEstimatorAPI = {
   },
 };
 
+export const logisticsAPI = {
+  // Create new logistics estimation
+  createEstimation: async (estimationData) => {
+    try {
+      console.log('Creating logistics estimation:', estimationData);
+      const response = await api.post('/logistics/estimate', estimationData);
+      console.log('Create logistics estimation response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating logistics estimation:', error);
+      console.error('Error response:', error.response);
+      throw error;
+    }
+  },
+
+  // Get estimation by ID
+  getEstimation: async (id) => {
+    try {
+      console.log('Fetching logistics estimation:', id);
+      const response = await api.get(`/logistics/estimate/${id}`);
+      console.log('Get logistics estimation response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching logistics estimation:', error);
+      throw error;
+    }
+  },
+
+  // Get all estimations
+  getEstimations: async () => {
+    try {
+      console.log('Fetching all logistics estimations');
+      const response = await api.get('/logistics/estimates');
+      console.log('Get logistics estimations response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching logistics estimations:', error);
+      throw error;
+    }
+  },
+
+  // Get labor rates for professional role selection
+  getLaborRates: async () => {
+    try {
+      console.log('Fetching labor rates');
+      const response = await api.get('/logistics/labor-rates');
+      console.log('Get labor rates response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching labor rates:', error);
+      throw error;
+    }
+  },
+};
+
 export default api;

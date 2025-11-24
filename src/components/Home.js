@@ -37,6 +37,9 @@ const Home = () => {
             <Link to="/hrs-estimator" className="cta-button secondary">
               HRS Sample Estimator
             </Link>
+            <Link to="/logistics" className="cta-button secondary">
+              Logistics Estimator
+            </Link>
           </div>
         </div>
       </div>
@@ -120,6 +123,9 @@ const Home = () => {
             </Link>
             <Link to="/hrs-estimator" className="cta-button primary">
               HRS Sample Estimator
+            </Link>
+            <Link to="/logistics" className="cta-button primary">
+              Logistics Estimator
             </Link>
           </div>
           <div className="footer-info">

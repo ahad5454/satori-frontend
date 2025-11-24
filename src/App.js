@@ -4,6 +4,8 @@ import Home from './components/Home';
 import LabTests from './components/LabTests';
 import HRSEstimator from './components/HRSEstimator';
 import EstimationsList from './components/EstimationsList';
+import Logistics from './components/Logistics';
+import LogisticsEstimationsList from './components/LogisticsEstimationsList';
 import './App.css';
 
 function App() {
@@ -15,6 +17,8 @@ function App() {
           <Route path="/lab-fees" element={<LabTests />} />
           <Route path="/hrs-estimator" element={<HRSEstimator />} />
           <Route path="/hrs-estimator/list" element={<EstimationsList />} />
+          <Route path="/logistics" element={<Logistics />} />
+          <Route path="/logistics/list" element={<LogisticsEstimationsList />} />
         </Routes>
       </div>
     </Router>
