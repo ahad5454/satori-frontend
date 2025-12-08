@@ -70,7 +70,7 @@ const LodgingSection = ({ data, setData, numStaff, isExpanded, onToggle }) => {
                   placeholder={numStaff || "0"}
                 />
                 <small style={{ fontSize: '0.8rem', color: '#666', marginTop: '4px', display: 'block' }}>
-                  Single occupancy: one room per staff
+                  Single occupancy: one room per staff (defaults to total staff count from Staff Breakdown)
                 </small>
               </div>
             </div>

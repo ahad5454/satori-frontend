@@ -6,6 +6,7 @@ import FlightsSection from './FlightsSection';
 import RentalSection from './RentalSection';
 import LodgingSection from './LodgingSection';
 import LogisticsResultsCard from './LogisticsResultsCard';
+import StaffRows from './StaffRows';
 import './Logistics.css';
 
 const Logistics = () => {
@@ -17,9 +18,8 @@ const Logistics = () => {
   const [siteAccessMode, setSiteAccessMode] = useState('driving');
   const [isLocalProject, setIsLocalProject] = useState(false);
   const [useClientVehicle, setUseClientVehicle] = useState(false);
-  const [professionalRole, setProfessionalRole] = useState('');
-  const [numStaff, setNumStaff] = useState(1);
-  const [perDiemRate, setPerDiemRate] = useState(0.0);
+  const [staffRows, setStaffRows] = useState([{ role: '', count: 0 }]);
+  const [perDiemRate, setPerDiemRate] = useState(50); // Default to $50 On-Road
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -41,12 +41,28 @@ const Logistics = () => {
     }));
   };
   
-  // Driving state
-  const [drivingData, setDrivingData] = useState({
+  // Rate multiplier state
+  const [rateMultiplier, setRateMultiplier] = useState(1.0);
+  
+  // Roundtrip driving state (for site_access_mode === "driving")
+  const [roundtripDrivingData, setRoundtripDrivingData] = useState({
     project_location: '',
     num_vehicles: 1,
     one_way_miles: 0.0,
-    drive_time_hours: 0.0,
+    drive_time_hours: null,
+    project_duration_days: 0,
+    mpg: null,
+    cost_per_gallon: null,
+    cost_per_mile: null,
+    anchorage_flat_fee: 45,
+  });
+  
+  // Daily driving state (lodging ⇄ site commute)
+  const [dailyDrivingData, setDailyDrivingData] = useState({
+    site_location: '',
+    lodging_location: '',
+    daily_miles: 0.0,
+    daily_drive_time_hours: null,
     project_duration_days: 0,
     mpg: null,
     cost_per_gallon: null,
@@ -118,19 +134,39 @@ const Logistics = () => {
       if (estimation.use_client_vehicle !== undefined) {
         setUseClientVehicle(estimation.use_client_vehicle);
       }
-      if (estimation.professional_role) {
-        setProfessionalRole(estimation.professional_role);
-      }
-      if (estimation.num_staff) {
-        setNumStaff(estimation.num_staff);
-      }
       if (estimation.per_diem_rate) {
-        setPerDiemRate(estimation.per_diem_rate);
+        // Map existing per_diem_rate to closest option (50 or 60)
+        const rate = parseFloat(estimation.per_diem_rate);
+        setPerDiemRate(rate === 60 ? 60 : 50);
       }
       
-      // Load input snapshots
+      // Load staff rows - prefer staff_breakdown (list), fallback to legacy fields
+      if (estimation.staff_breakdown && Array.isArray(estimation.staff_breakdown) && estimation.staff_breakdown.length > 0) {
+        // New format: staff_breakdown is a list of { role, count }
+        setStaffRows(estimation.staff_breakdown.map(s => ({ role: s.role || '', count: s.count || 0 })));
+      } else if (estimation.professional_role && estimation.num_staff) {
+        // Legacy format: convert to single staff row
+        setStaffRows([{ role: estimation.professional_role, count: estimation.num_staff }]);
+      }
+      
+      // Load input snapshots - handle new driving structure
       if (estimation.driving_input) {
-        setDrivingData(estimation.driving_input);
+        if (estimation.driving_input.roundtrip) {
+          setRoundtripDrivingData(estimation.driving_input.roundtrip);
+        }
+        if (estimation.driving_input.daily) {
+          setDailyDrivingData(estimation.driving_input.daily);
+        }
+        // Legacy: if driving_input is not nested, treat as roundtrip only
+        if (!estimation.driving_input.roundtrip && !estimation.driving_input.daily) {
+          setRoundtripDrivingData(estimation.driving_input);
+          // Daily section remains empty for legacy records
+        }
+      }
+      
+      // Load rate multiplier if present
+      if (estimation.rate_multiplier !== undefined && estimation.rate_multiplier !== null) {
+        setRateMultiplier(estimation.rate_multiplier);
       }
       if (estimation.flights_input) {
         setFlightsData(estimation.flights_input);
@@ -152,31 +188,91 @@ const Logistics = () => {
     }
   }, [location.state]);
   
+  // Calculate total staff count from staff rows
+  const totalStaff = staffRows.reduce((sum, row) => sum + (parseInt(row.count) || 0), 0);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     setEstimationResult(null);
     
+    // Validation: require at least one staff row with count > 0
+    const validStaffRows = staffRows.filter(row => row.role && (parseInt(row.count) || 0) > 0);
+    if (validStaffRows.length === 0) {
+      setError('Please add at least one staff member with a role and count greater than 0.');
+      setLoading(false);
+      return;
+    }
+    
+    // Validation for driving mode: require roundtrip driving
+    if (siteAccessMode === 'driving') {
+      if (!roundtripDrivingData.project_location || !roundtripDrivingData.project_duration_days) {
+        setError('Roundtrip driving requires project location and duration.');
+        setLoading(false);
+        return;
+      }
+      const isAnchorage = roundtripDrivingData.project_location.toLowerCase() === 'anchorage';
+      if (!isAnchorage) {
+        // For non-Anchorage: require either cost-per-mile OR (MPG + cost-per-gallon)
+        const hasCostPerMile = roundtripDrivingData.cost_per_mile && parseFloat(roundtripDrivingData.cost_per_mile) > 0;
+        const hasMpgAndGallon = roundtripDrivingData.mpg && roundtripDrivingData.cost_per_gallon && 
+                                parseFloat(roundtripDrivingData.mpg) > 0 && parseFloat(roundtripDrivingData.cost_per_gallon) > 0;
+        const hasMiles = roundtripDrivingData.one_way_miles && parseFloat(roundtripDrivingData.one_way_miles) > 0;
+        
+        if (hasMiles && !hasCostPerMile && !hasMpgAndGallon) {
+          setError('For non-Anchorage locations, please provide either cost-per-mile or MPG + cost-per-gallon.');
+          setLoading(false);
+          return;
+        }
+      }
+    }
+    
     try {
+      // Build staff array from valid rows
+      const staffArray = validStaffRows.map(row => ({
+        role: row.role,
+        count: parseInt(row.count) || 0
+      }));
+      
+      // Build roundtrip driving payload (only for driving mode)
+      const roundtripDriving = siteAccessMode === 'driving' && roundtripDrivingData.project_location ? {
+        project_location: roundtripDrivingData.project_location,
+        num_vehicles: Number(roundtripDrivingData.num_vehicles) || 1,
+        one_way_miles: parseFloat(roundtripDrivingData.one_way_miles) || 0.0, // Required float, not Optional
+        drive_time_hours: roundtripDrivingData.drive_time_hours ? parseFloat(roundtripDrivingData.drive_time_hours) : null,
+        project_duration_days: Number(roundtripDrivingData.project_duration_days) || 0,
+        mpg: roundtripDrivingData.mpg ? parseFloat(roundtripDrivingData.mpg) : null,
+        cost_per_gallon: roundtripDrivingData.cost_per_gallon ? parseFloat(roundtripDrivingData.cost_per_gallon) : null,
+        cost_per_mile: roundtripDrivingData.cost_per_mile ? parseFloat(roundtripDrivingData.cost_per_mile) : null,
+        anchorage_flat_fee: roundtripDrivingData.anchorage_flat_fee ? parseFloat(roundtripDrivingData.anchorage_flat_fee) : null,
+      } : null;
+      
+      // Build daily driving payload (optional, can apply to both driving and flight modes)
+      const dailyDriving = (dailyDrivingData.site_location || dailyDrivingData.lodging_location || dailyDrivingData.daily_miles) ? {
+        site_location: dailyDrivingData.site_location || null,
+        lodging_location: dailyDrivingData.lodging_location || null,
+        daily_miles: parseFloat(dailyDrivingData.daily_miles) || 0.0, // Required float, not Optional
+        daily_drive_time_hours: dailyDrivingData.daily_drive_time_hours ? parseFloat(dailyDrivingData.daily_drive_time_hours) : null,
+        project_duration_days: Number(dailyDrivingData.project_duration_days) || 0,
+        mpg: dailyDrivingData.mpg ? parseFloat(dailyDrivingData.mpg) : null,
+        cost_per_gallon: dailyDrivingData.cost_per_gallon ? parseFloat(dailyDrivingData.cost_per_gallon) : null,
+        cost_per_mile: dailyDrivingData.cost_per_mile ? parseFloat(dailyDrivingData.cost_per_mile) : null,
+      } : null;
+      
       const payload = {
         project_name: projectName || null,
         site_access_mode: siteAccessMode,
         is_local_project: isLocalProject,
         use_client_vehicle: useClientVehicle,
-        professional_role: professionalRole || null,
-        num_staff: Number(numStaff) || 0,
+        professional_role: null, // legacy
+        num_staff: totalStaff, // legacy
         per_diem_rate: parseFloat(perDiemRate) || 0.0,
-        driving: siteAccessMode === 'driving' ? {
-          project_location: drivingData.project_location || null,
-          num_vehicles: Number(drivingData.num_vehicles) || 0,
-          one_way_miles: parseFloat(drivingData.one_way_miles) || 0.0,
-          drive_time_hours: parseFloat(drivingData.drive_time_hours) || 0.0,
-          project_duration_days: Number(drivingData.project_duration_days) || 0,
-          mpg: drivingData.mpg ? parseFloat(drivingData.mpg) : null,
-          cost_per_gallon: drivingData.cost_per_gallon ? parseFloat(drivingData.cost_per_gallon) : null,
-          cost_per_mile: drivingData.cost_per_mile ? parseFloat(drivingData.cost_per_mile) : null,
-        } : null,
+        rate_multiplier: parseFloat(rateMultiplier) || 1.0,
+        // Send staff array (new preferred format)
+        staff: staffArray.length > 0 ? staffArray : undefined,
+        roundtrip_driving: roundtripDriving,
+        daily_driving: dailyDriving,
         flights: siteAccessMode === 'flight' && !isLocalProject ? {
           project_location: flightsData.project_location || null,
           num_tickets: Number(flightsData.num_tickets) || 0,
@@ -204,7 +300,7 @@ const Logistics = () => {
           hotel_name: lodgingData.hotel_name || null,
           night_cost_with_taxes: parseFloat(lodgingData.night_cost_with_taxes) || 0.0,
           project_duration_days: Number(lodgingData.project_duration_days) || 0,
-          num_staff: Number(lodgingData.num_staff) || Number(numStaff) || 0,
+          num_staff: Number(lodgingData.num_staff) || totalStaff || 0,
         } : null,
       };
       
@@ -221,7 +317,7 @@ const Logistics = () => {
   };
   
   // Determine which sections should be visible
-  const showDriving = siteAccessMode === 'driving' || isLocalProject;
+  const showDriving = siteAccessMode === 'driving' || (siteAccessMode === 'flight' && !isLocalProject);
   const showFlights = siteAccessMode === 'flight' && !isLocalProject;
   const showRental = siteAccessMode === 'flight' && !isLocalProject && !useClientVehicle;
   const showLodging = !isLocalProject;
@@ -337,41 +433,34 @@ const Logistics = () => {
             </div>
           )}
 
-          {/* Professional Role Selection */}
+          {/* Rate Multiplier */}
           <div className="form-section">
             <div className="form-group">
-              <label htmlFor="professional-role">Professional Role (for travel labor costs)</label>
+              <label htmlFor="rate-multiplier">Rate Multiplier (%)</label>
               <select
-                id="professional-role"
-                value={professionalRole}
-                onChange={(e) => setProfessionalRole(e.target.value)}
+                id="rate-multiplier"
+                value={rateMultiplier}
+                onChange={(e) => setRateMultiplier(parseFloat(e.target.value))}
                 className="form-input"
               >
-                <option value="">-- Select Role --</option>
-                {laborRates.map((rate) => (
-                  <option key={rate.labor_role} value={rate.labor_role}>
-                    {rate.labor_role} (${rate.hourly_rate.toFixed(2)}/hr)
-                  </option>
-                ))}
+                <option value={1.0}>100%</option>
+                <option value={0.75}>75%</option>
+                <option value={0.5}>50%</option>
               </select>
+              <small style={{ fontSize: '0.8rem', color: '#666', marginTop: '4px', display: 'block' }}>
+                Applied to all staff labor costs
+              </small>
             </div>
           </div>
 
-          {/* Number of Staff */}
+          {/* Staff Rows */}
           <div className="form-section">
-            <div className="form-group">
-              <label htmlFor="num-staff">Number of Staff</label>
-              <input
-                id="num-staff"
-                type="number"
-                min="1"
-                step="1"
-                value={numStaff}
-                onChange={(e) => setNumStaff(e.target.value)}
-                className="form-input"
-                placeholder="1"
-              />
-            </div>
+            <StaffRows
+              staffRows={staffRows}
+              setStaffRows={setStaffRows}
+              laborRates={laborRates}
+              totalStaffCount={totalStaff}
+            />
           </div>
 
           {/* Per Diem Rate */}
@@ -379,16 +468,15 @@ const Logistics = () => {
             <div className="form-section">
               <div className="form-group">
                 <label htmlFor="per-diem-rate">Per Diem Rate (per person per day)</label>
-                <input
+                <select
                   id="per-diem-rate"
-                  type="number"
-                  min="0"
-                  step="0.01"
                   value={perDiemRate}
-                  onChange={(e) => setPerDiemRate(e.target.value)}
+                  onChange={(e) => setPerDiemRate(parseFloat(e.target.value))}
                   className="form-input"
-                  placeholder="0.00"
-                />
+                >
+                  <option value={50}>$50 On-Road</option>
+                  <option value={60}>$60 Off-Road</option>
+                </select>
               </div>
             </div>
           )}
@@ -396,12 +484,16 @@ const Logistics = () => {
           {/* Driving Section */}
           {showDriving && (
             <DrivingSection
-              data={drivingData}
-              setData={setDrivingData}
+              roundtripData={roundtripDrivingData}
+              setRoundtripData={setRoundtripDrivingData}
+              dailyData={dailyDrivingData}
+              setDailyData={setDailyDrivingData}
+              siteAccessMode={siteAccessMode}
               isExpanded={expandedSections.driving}
               onToggle={() => toggleSection('driving')}
             />
           )}
+          
 
           {/* Flights Section */}
           {showFlights && (
@@ -428,7 +520,7 @@ const Logistics = () => {
             <LodgingSection
               data={lodgingData}
               setData={setLodgingData}
-              numStaff={numStaff}
+              numStaff={totalStaff}
               isExpanded={expandedSections.lodging}
               onToggle={() => toggleSection('lodging')}
             />
