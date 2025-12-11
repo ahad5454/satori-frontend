@@ -7,6 +7,7 @@ import RentalSection from './RentalSection';
 import LodgingSection from './LodgingSection';
 import LogisticsResultsCard from './LogisticsResultsCard';
 import StaffRows from './StaffRows';
+import ProjectHeader from './ProjectHeader';
 import './Logistics.css';
 
 const Logistics = () => {
@@ -117,6 +118,21 @@ const Logistics = () => {
     fetchLaborRates();
   }, []);
   
+  // Load project name from localStorage on mount
+  useEffect(() => {
+    const savedProjectName = localStorage.getItem('currentProjectName');
+    if (savedProjectName && !projectName) {
+      setProjectName(savedProjectName);
+    }
+  }, []);
+
+  // Save project name to localStorage when it changes
+  useEffect(() => {
+    if (projectName) {
+      localStorage.setItem('currentProjectName', projectName);
+    }
+  }, [projectName]);
+
   // Load estimation data from navigation state if available
   useEffect(() => {
     if (location.state?.estimationData) {
@@ -343,20 +359,26 @@ const Logistics = () => {
         <p>Estimate travel, transportation, and accommodation costs for field projects</p>
       </header>
 
+      {/* Project Header with Navigation */}
+      <ProjectHeader projectName={projectName} moduleName="logistics" />
+
       <div className="logistics-content">
         <form onSubmit={handleSubmit} className="logistics-form">
           {/* Project Name */}
           <div className="form-section">
             <div className="form-group">
-              <label htmlFor="project-name">Project Name (Optional)</label>
+              <label htmlFor="project-name">Project Name</label>
               <input
                 id="project-name"
                 type="text"
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
-                placeholder="Enter project name"
+                placeholder="Enter project name (e.g., 'One Sample')"
                 className="form-input"
               />
+              <small style={{ fontSize: '0.85rem', color: '#666', marginTop: '4px', display: 'block' }}>
+                This project name will be shared across all modules
+              </small>
             </div>
           </div>
 

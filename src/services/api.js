@@ -153,6 +153,49 @@ export const labFeesAPI = {
       throw error;
     }
   },
+
+  // Get labor rates for staff role selection
+  getLaborRates: async () => {
+    try {
+      console.log('Fetching labor rates');
+      const response = await api.get('/lab-fees/labor-rates');
+      console.log('Get labor rates response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching labor rates:', error);
+      throw error;
+    }
+  },
+
+  // Create lab fees order with staff assignments
+  createOrder: async (orderData) => {
+    try {
+      console.log('Creating lab fees order:', orderData);
+      const response = await api.post('/lab-fees/orders/', orderData);
+      console.log('Create order response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating order:', error);
+      console.error('Error response:', error.response);
+      throw error;
+    }
+  },
+
+  // Get lab fees orders
+  getOrders: async (projectName, hrsEstimationId) => {
+    try {
+      const params = new URLSearchParams();
+      if (projectName) params.append('project_name', projectName);
+      if (hrsEstimationId) params.append('hrs_estimation_id', hrsEstimationId);
+      
+      const url = `/lab-fees/orders/${params.toString() ? '?' + params.toString() : ''}`;
+      const response = await api.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      throw error;
+    }
+  },
 };
 
 export const hrsEstimatorAPI = {
@@ -192,6 +235,19 @@ export const hrsEstimatorAPI = {
       return response.data;
     } catch (error) {
       console.error('Error fetching estimations:', error);
+      throw error;
+    }
+  },
+
+  // Get labor rates for professional role selection
+  getLaborRates: async () => {
+    try {
+      console.log('Fetching labor rates');
+      const response = await api.get('/hrs-estimator/labor-rates');
+      console.log('Get labor rates response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching labor rates:', error);
       throw error;
     }
   },

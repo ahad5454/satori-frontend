@@ -1,6 +1,6 @@
 import React from 'react';
 
-const StaffRows = ({ staffRows, setStaffRows, laborRates, totalStaffCount }) => {
+const StaffRows = ({ staffRows, setStaffRows, laborRates, totalStaffCount, fieldStaffCount }) => {
   const handleAddRow = () => {
     setStaffRows([...staffRows, { role: '', count: 0 }]);
   };
@@ -72,12 +72,12 @@ const StaffRows = ({ staffRows, setStaffRows, laborRates, totalStaffCount }) => 
               <div className="staff-count-cell">
                 <input
                   type="number"
-                  min="0"
+                  min="1"
                   step="1"
                   value={row.count || ''}
                   onChange={(e) => handleCountChange(index, e.target.value)}
                   className="form-input staff-count-input"
-                  placeholder="0"
+                  placeholder="1"
                 />
               </div>
               <div className="staff-rate-cell">
@@ -88,7 +88,7 @@ const StaffRows = ({ staffRows, setStaffRows, laborRates, totalStaffCount }) => 
                 )}
               </div>
               <div className="staff-remove-cell">
-                {staffRows.length > 1 && (
+                {staffRows.length > parseInt(fieldStaffCount || 1) && (
                   <button
                     type="button"
                     onClick={() => handleRemoveRow(index)}

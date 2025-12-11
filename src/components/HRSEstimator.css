@@ -389,6 +389,91 @@
   font-weight: bold;
 }
 
+/* Staff Breakdown Table */
+.staff-breakdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.staff-breakdown-table thead {
+  background: linear-gradient(135deg, #3498db, #2980b9);
+  color: white;
+}
+
+.staff-breakdown-table th {
+  padding: 12px 15px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.staff-breakdown-table th.text-center {
+  text-align: center;
+}
+
+.staff-breakdown-table th.text-right {
+  text-align: right;
+}
+
+.staff-breakdown-table tbody tr {
+  border-bottom: 1px solid #e0e0e0;
+  transition: background 0.2s ease;
+}
+
+.staff-breakdown-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.staff-breakdown-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.staff-breakdown-table td {
+  padding: 12px 15px;
+  color: #2c3e50;
+  font-size: 0.95rem;
+}
+
+.staff-breakdown-table td.text-center {
+  text-align: center;
+}
+
+.staff-breakdown-table td.text-right {
+  text-align: right;
+  font-weight: 500;
+}
+
+.show-breakdown-btn {
+  padding: 12px 24px;
+  background: #95a5a6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.show-breakdown-btn:hover {
+  background: #7f8c8d;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.show-breakdown-btn.active {
+  background: #3498db;
+}
+
+.show-breakdown-btn.active:hover {
+  background: #2980b9;
+}
+
 /* Estimations List Styles */
 .estimations-list-container {
   background: white;
