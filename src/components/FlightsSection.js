@@ -7,7 +7,7 @@ const FlightsSection = ({ data, setData, isExpanded, onToggle }) => {
         className="section-header clickable"
         onClick={onToggle}
       >
-        <h2>✈️ Flights</h2>
+        <h2>Flights</h2>
         <span className="toggle-icon">{isExpanded ? '▼' : '▶'}</span>
       </div>
       {isExpanded && (

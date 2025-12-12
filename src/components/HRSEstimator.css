@@ -684,6 +684,180 @@
   box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
 }
 
+/* Staff Rows Section - Shared with Logistics */
+.staff-rows-section {
+  margin-bottom: 25px;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 10px;
+  border: 2px solid #e0e0e0;
+}
+
+.staff-rows-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.staff-rows-header h3 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 1.3rem;
+  font-weight: bold;
+}
+
+.total-staff-display {
+  color: #2c3e50;
+  font-size: 1.1rem;
+}
+
+.staff-rows-table {
+  margin-bottom: 15px;
+}
+
+.staff-rows-header-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr 120px;
+  gap: 15px;
+  padding: 10px 15px;
+  background: #e9ecef;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  font-weight: bold;
+  color: #2c3e50;
+  font-size: 0.9rem;
+}
+
+.staff-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr 120px;
+  gap: 15px;
+  padding: 15px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  margin-bottom: 10px;
+  align-items: center;
+}
+
+.staff-role-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.staff-role-select {
+  width: 100%;
+}
+
+.staff-count-cell {
+  display: flex;
+  align-items: center;
+}
+
+.staff-count-input {
+  width: 100%;
+  max-width: 100px;
+}
+
+.staff-rate-cell {
+  display: flex;
+  align-items: center;
+}
+
+.rate-display {
+  color: #2c3e50;
+  font-weight: 500;
+}
+
+.rate-display.no-rate {
+  color: #999;
+  font-style: italic;
+}
+
+.rate-warning {
+  color: #f39c12;
+  font-size: 0.75rem;
+  display: block;
+  margin-top: 4px;
+}
+
+.staff-remove-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remove-row-btn {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.remove-row-btn:hover {
+  background: #c0392b;
+  transform: scale(1.1);
+}
+
+/* Delete Staff Button - Professional Style */
+.delete-staff-btn {
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 6px rgba(231, 76, 60, 0.3);
+  white-space: nowrap;
+}
+
+.delete-staff-btn:hover {
+  background: linear-gradient(135deg, #c0392b, #a93226);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(231, 76, 60, 0.4);
+}
+
+.delete-staff-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(231, 76, 60, 0.3);
+}
+
+.add-staff-row-btn {
+  background: linear-gradient(135deg, #3498db, #2980b9);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+}
+
+.add-staff-row-btn:hover {
+  background: linear-gradient(135deg, #2980b9, #21618c);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3);
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .input-row {
@@ -714,6 +888,50 @@
 
   .estimation-card-actions {
     flex-direction: column;
+  }
+
+  .staff-rows-header-row,
+  .staff-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .staff-rows-header-row {
+    display: none;
+  }
+
+  .staff-row {
+    padding: 15px;
+  }
+
+  .staff-role-header,
+  .staff-count-header,
+  .staff-rate-header,
+  .staff-remove-header {
+    display: none;
+  }
+
+  .staff-role-cell::before {
+    content: "Role: ";
+    font-weight: bold;
+    color: #555;
+  }
+
+  .staff-count-cell::before {
+    content: "Count: ";
+    font-weight: bold;
+    color: #555;
+  }
+
+  .staff-rate-cell::before {
+    content: "Rate: ";
+    font-weight: bold;
+    color: #555;
+  }
+
+  .delete-staff-btn {
+    width: 100%;
+    justify-content: center;
   }
 }
 

@@ -124,6 +124,7 @@ const Logistics = () => {
     if (savedProjectName && !projectName) {
       setProjectName(savedProjectName);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Save project name to localStorage when it changes
@@ -342,21 +343,21 @@ const Logistics = () => {
     <div className="logistics-container">
       <nav className="logistics-nav">
         <Link to="/" className="nav-link">
-          🏠 Home
+          Home
         </Link>
         <div className="nav-title">
-          <h1>🚚 Logistics Estimator</h1>
+          <h1>Logistics Estimator</h1>
         </div>
         <button 
           className="view-estimations-btn"
           onClick={() => navigate('/logistics/list')}
         >
-          📋 View Previous Estimates
+          View Previous Estimates
         </button>
       </nav>
 
       <header className="logistics-header">
-        <p>Estimate travel, transportation, and accommodation costs for field projects</p>
+        <p>Calculate travel and accommodation costs for your project</p>
       </header>
 
       {/* Project Header with Navigation */}
@@ -395,7 +396,7 @@ const Logistics = () => {
                     checked={siteAccessMode === 'driving'}
                     onChange={(e) => setSiteAccessMode(e.target.value)}
                   />
-                  <span>🚗 Driving</span>
+                  <span>Driving</span>
                 </label>
                 <label className="radio-label">
                   <input
@@ -405,51 +406,55 @@ const Logistics = () => {
                     checked={siteAccessMode === 'flight'}
                     onChange={(e) => setSiteAccessMode(e.target.value)}
                   />
-                  <span>✈️ Flight</span>
+                  <span>Flight</span>
                 </label>
               </div>
             </div>
           </div>
 
-          {/* Local Project Toggle */}
+          {/* Local Project Option */}
           <div className="form-section">
             <div className="form-group">
-              <div className="toggle-row">
-                <label htmlFor="local-project-toggle" className="toggle-text-label">
-                  Local Project (Satori-owned vehicle, no flights/rental/lodging)
+              <label style={{ display: 'block', marginBottom: '12px', color: '#2c3e50', fontWeight: 'bold', fontSize: '1rem' }}>
+                Project Type
+              </label>
+              <div className="simple-option-row">
+                <label htmlFor="local-project-toggle" className="simple-option-label">
+                  <span className="simple-option-text">
+                    <strong>Local Project</strong> - Satori-owned vehicle, no flights/rental/lodging
+                  </span>
                 </label>
-                <label className="toggle-switch-label">
-                  <input
-                    id="local-project-toggle"
-                    type="checkbox"
-                    checked={isLocalProject}
-                    onChange={(e) => setIsLocalProject(e.target.checked)}
-                    className="toggle-checkbox"
-                  />
-                  <span className="toggle-switch"></span>
-                </label>
+                <input
+                  id="local-project-toggle"
+                  type="checkbox"
+                  checked={isLocalProject}
+                  onChange={(e) => setIsLocalProject(e.target.checked)}
+                  className="simple-option-checkbox"
+                />
               </div>
             </div>
           </div>
 
-          {/* Use Client Vehicle Toggle */}
+          {/* Use Client Vehicle Option */}
           {siteAccessMode === 'flight' && !isLocalProject && (
             <div className="form-section">
               <div className="form-group">
-                <div className="toggle-row">
-                  <label htmlFor="client-vehicle-toggle" className="toggle-text-label">
-                    Use Client Vehicle (no rental required)
+                <label style={{ display: 'block', marginBottom: '12px', color: '#2c3e50', fontWeight: 'bold', fontSize: '1rem' }}>
+                  Vehicle Option
+                </label>
+                <div className="simple-option-row">
+                  <label htmlFor="client-vehicle-toggle" className="simple-option-label">
+                    <span className="simple-option-text">
+                      <strong>Use Client Vehicle</strong> - No rental required
+                    </span>
                   </label>
-                  <label className="toggle-switch-label">
-                    <input
-                      id="client-vehicle-toggle"
-                      type="checkbox"
-                      checked={useClientVehicle}
-                      onChange={(e) => setUseClientVehicle(e.target.checked)}
-                      className="toggle-checkbox"
-                    />
-                    <span className="toggle-switch"></span>
-                  </label>
+                  <input
+                    id="client-vehicle-toggle"
+                    type="checkbox"
+                    checked={useClientVehicle}
+                    onChange={(e) => setUseClientVehicle(e.target.checked)}
+                    className="simple-option-checkbox"
+                  />
                 </div>
               </div>
             </div>
@@ -562,7 +567,7 @@ const Logistics = () => {
           {/* Error Display */}
           {error && (
             <div className="error-message">
-              <p>⚠️ {error}</p>
+              <p><strong>Error:</strong> {error}</p>
             </div>
           )}
         </form>

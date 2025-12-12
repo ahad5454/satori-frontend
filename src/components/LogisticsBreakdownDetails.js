@@ -79,7 +79,7 @@ const LogisticsBreakdownDetails = ({ details }) => {
       {staffBreakdown.length > 0 && details.staff_labor_costs && (
         <div className="breakdown-section">
           <div className="breakdown-section-header" onClick={() => toggleSection('staff')}>
-            <h4>👥 Staff Labor Costs</h4>
+            <h4>Staff Labor Costs</h4>
             <span className="toggle-icon">{expandedSections.staff ? '▼' : '▶'}</span>
           </div>
           {expandedSections.staff && (
@@ -141,7 +141,7 @@ const LogisticsBreakdownDetails = ({ details }) => {
       {roundtripInput && details.roundtrip_driving_miles > 0 && (
         <div className="breakdown-section">
           <div className="breakdown-section-header" onClick={() => toggleSection('roundtrip')}>
-            <h4>🚗 Roundtrip Driving</h4>
+            <h4>Roundtrip Driving</h4>
             <span className="toggle-icon">{expandedSections.roundtrip ? '▼' : '▶'}</span>
           </div>
           {expandedSections.roundtrip && (
@@ -207,7 +207,7 @@ const LogisticsBreakdownDetails = ({ details }) => {
       {dailyInput && details.daily_driving_miles > 0 && (
         <div className="breakdown-section">
           <div className="breakdown-section-header" onClick={() => toggleSection('daily')}>
-            <h4>🚗 Daily Driving</h4>
+            <h4>Daily Driving</h4>
             <span className="toggle-icon">{expandedSections.daily ? '▼' : '▶'}</span>
           </div>
           {expandedSections.daily && (
@@ -283,7 +283,7 @@ const LogisticsBreakdownDetails = ({ details }) => {
       {(details.total_driving_cost > 0) && (
         <div className="breakdown-section">
           <div className="breakdown-section-header" onClick={() => toggleSection('combined')}>
-            <h4>🚗 Combined Driving Cost</h4>
+            <h4>Combined Driving Cost</h4>
             <span className="toggle-icon">{expandedSections.combined ? '▼' : '▶'}</span>
           </div>
           {expandedSections.combined && (
@@ -318,7 +318,7 @@ const LogisticsBreakdownDetails = ({ details }) => {
       {flightsInput && details.total_flight_cost > 0 && (
         <div className="breakdown-section">
           <div className="breakdown-section-header" onClick={() => toggleSection('flights')}>
-            <h4>✈️ Flight Costs</h4>
+            <h4>Flight Costs</h4>
             <span className="toggle-icon">{expandedSections.flights ? '▼' : '▶'}</span>
           </div>
           {expandedSections.flights && (
@@ -452,7 +452,7 @@ const LogisticsBreakdownDetails = ({ details }) => {
       {/* Grand Total */}
       <div className="breakdown-section highlight">
         <div className="breakdown-section-header" onClick={() => toggleSection('total')}>
-          <h4>💰 Grand Total</h4>
+          <h4>Grand Total</h4>
           <span className="toggle-icon">{expandedSections.total ? '▼' : '▶'}</span>
         </div>
         {expandedSections.total && (

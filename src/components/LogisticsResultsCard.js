@@ -54,7 +54,7 @@ const LogisticsResultsCard = ({ result }) => {
       {/* Staff Labor Cost Breakdown */}
       {hasStaffBreakdown && (
         <div className="category-breakdown">
-          <h3>👥 Staff Labor Cost Breakdown</h3>
+          <h3>Staff Labor Cost Breakdown</h3>
           <table className="staff-breakdown-table">
             <thead>
               <tr>
@@ -93,7 +93,7 @@ const LogisticsResultsCard = ({ result }) => {
       {/* Driving Totals */}
       {(result.total_driving_cost > 0 || result.total_driving_miles > 0) && (
         <div className="category-breakdown">
-          <h3>🚗 Driving Costs</h3>
+          <h3>Driving Costs</h3>
           <div className="breakdown-list">
             {(result.roundtrip_driving_miles !== undefined && result.roundtrip_driving_miles !== null) && (
               <div className="breakdown-item">
@@ -164,7 +164,7 @@ const LogisticsResultsCard = ({ result }) => {
       {/* Flight Totals */}
       {(result.total_flight_cost > 0 || result.total_flight_ticket_cost > 0) && (
         <div className="category-breakdown">
-          <h3>✈️ Flight Costs</h3>
+          <h3>Flight Costs</h3>
           <div className="breakdown-list">
             <div className="breakdown-item">
               <span className="category-name">Flight Ticket Cost</span>

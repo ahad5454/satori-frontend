@@ -74,8 +74,9 @@ const DrivingSection = ({
   // Pre-fill site location from roundtrip project location
   useEffect(() => {
     if (roundtripData?.project_location && !dailyData?.site_location && locationType === 'other') {
-      setDailyData({ ...dailyData, site_location: roundtripData.project_location });
+      setDailyData(prev => ({ ...prev, site_location: roundtripData.project_location }));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundtripData?.project_location, locationType]);
   
   // If roundtripData is null/undefined, don't show roundtrip section
@@ -87,7 +88,7 @@ const DrivingSection = ({
         className="section-header clickable"
         onClick={onToggle}
       >
-        <h2>🚗 Driving</h2>
+        <h2>Driving</h2>
         <span className="toggle-icon">{isExpanded ? '▼' : '▶'}</span>
       </div>
       {isExpanded && (
@@ -317,7 +318,7 @@ const DrivingSection = ({
                 <div className="input-row">
                   <div className="input-group">
                     <small style={{ fontSize: '0.8rem', color: '#f39c12', marginTop: '4px', display: 'block' }}>
-                      ⚠️ Anchorage daily driving: Vehicle cost is covered by flat fee (labor hours still apply)
+                      <strong>Note:</strong> For Anchorage daily driving, vehicle cost is covered by a flat fee. Labor hours still apply.
                     </small>
                   </div>
                 </div>

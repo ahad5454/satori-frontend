@@ -65,7 +65,7 @@ const StaffRows = ({ staffRows, setStaffRows, laborRates, totalStaffCount, field
                 </select>
                 {row.role && !hasRate && (
                   <small className="rate-warning">
-                    ⚠️ No rate found for this role — labor cost will be $0.00
+                    No hourly rate found for this role. Labor cost will be $0.00.
                   </small>
                 )}
               </div>
@@ -88,7 +88,23 @@ const StaffRows = ({ staffRows, setStaffRows, laborRates, totalStaffCount, field
                 )}
               </div>
               <div className="staff-remove-cell">
-                {staffRows.length > parseInt(fieldStaffCount || 1) && (
+                {row.role && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Clear the role and count for this row
+                      const newRows = [...staffRows];
+                      newRows[index] = { role: '', count: 0 };
+                      setStaffRows(newRows);
+                    }}
+                    className="delete-staff-btn"
+                    title="Delete selected staff"
+                  >
+                    <span>🗑️</span>
+                    <span>Delete</span>
+                  </button>
+                )}
+                {!row.role && staffRows.length > parseInt(fieldStaffCount || 1) && (
                   <button
                     type="button"
                     onClick={() => handleRemoveRow(index)}
@@ -109,7 +125,7 @@ const StaffRows = ({ staffRows, setStaffRows, laborRates, totalStaffCount, field
         onClick={handleAddRow}
         className="add-staff-row-btn"
       >
-        ➕ Add Staff Row
+        Add Another Staff Member
       </button>
     </div>
   );

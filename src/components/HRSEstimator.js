@@ -445,7 +445,7 @@ const HRSEstimator = () => {
     <div className="hrs-estimator-container">
       <nav className="hrs-estimator-nav">
         <Link to="/" className="nav-link">
-          🏠 Home
+          Home
         </Link>
         <div className="nav-title">
           <h1>HRS Sample Estimator</h1>
@@ -454,12 +454,12 @@ const HRSEstimator = () => {
           className="view-estimations-btn"
           onClick={() => navigate('/hrs-estimator/list')}
         >
-          📋 View Previous Estimations
+          View Previous Estimates
         </button>
       </nav>
 
       <header className="hrs-estimator-header">
-        <p>Estimate field hours for asbestos, lead, mold, and other regulated materials sampling</p>
+        <p>Calculate the hours needed for field sampling work</p>
       </header>
 
       {/* Project Header with Navigation */}
@@ -480,7 +480,7 @@ const HRSEstimator = () => {
                 className="form-input"
               />
               <small style={{ fontSize: '0.85rem', color: '#666', marginTop: '4px', display: 'block' }}>
-                This project name will be shared across all modules
+                Use the same project name across all tools to keep everything organized
               </small>
             </div>
           </div>
@@ -491,57 +491,74 @@ const HRSEstimator = () => {
               className="section-header clickable"
               onClick={() => toggleSection('asbestos')}
             >
-              <h2>🔷 Asbestos Sampling</h2>
+              <h2>Asbestos Sampling</h2>
               <span className="toggle-icon">{expandedSections.asbestos ? '▼' : '▶'}</span>
             </div>
             {expandedSections.asbestos && (
             <div className="section-content">
               <div className="input-grid">
-                {Object.entries(asbestosData).map(([component, data]) => (
-                  <div key={component} className="input-row">
-                    <div className="component-name">{component}</div>
-                    <div className="input-group">
-                      <label>Number of {data.unit_label}</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={data.actuals}
-                        onChange={(e) => {
-                          setAsbestosData({
-                            ...asbestosData,
-                            [component]: { ...data, actuals: e.target.value }
-                          });
-                        }}
-                        className="form-input small"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div className="input-group">
-                      <label>Bulk Samples per {data.unit_label === 'Rooms' ? 'Room' : data.unit_label === 'LF' ? 'Linear Foot' : 'Each'}</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={data.bulks_per_unit}
-                        onChange={(e) => {
-                          setAsbestosData({
-                            ...asbestosData,
-                            [component]: { ...data, bulks_per_unit: e.target.value }
-                          });
-                        }}
-                        className="form-input small"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div className="calculated-value">
-                      <label>Total Bulk Samples</label>
-                      <div className="value-display">
-                        {asbestosTotals.bulkSummaries[component].toFixed(2)}
+                {Object.entries(asbestosData).map(([component, data]) => {
+                  const isRooms = data.unit_label === 'Rooms';
+                  const stepValue = isRooms ? "1" : "0.01";
+                  
+                  return (
+                    <div key={component} className="input-row">
+                      <div className="component-name">{component}</div>
+                      <div className="input-group">
+                        <label>Number of {data.unit_label}</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step={stepValue}
+                          value={data.actuals}
+                          onChange={(e) => {
+                            let value = e.target.value;
+                            // For rooms, only allow whole numbers
+                            if (isRooms && value !== '' && !isNaN(value)) {
+                              value = Math.floor(Math.max(0, parseFloat(value) || 0)).toString();
+                            }
+                            setAsbestosData({
+                              ...asbestosData,
+                              [component]: { ...data, actuals: value }
+                            });
+                          }}
+                          className="form-input small"
+                          placeholder="0"
+                        />
+                      </div>
+                      <div className="input-group">
+                        <label>Bulk Samples per {data.unit_label === 'Rooms' ? 'Room' : data.unit_label === 'LF' ? 'Linear Foot' : 'Each'}</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step={stepValue}
+                          value={data.bulks_per_unit}
+                          onChange={(e) => {
+                            let value = e.target.value;
+                            // For rooms, only allow whole numbers
+                            if (isRooms && value !== '' && !isNaN(value)) {
+                              value = Math.floor(Math.max(0, parseFloat(value) || 0)).toString();
+                            }
+                            setAsbestosData({
+                              ...asbestosData,
+                              [component]: { ...data, bulks_per_unit: value }
+                            });
+                          }}
+                          className="form-input small"
+                          placeholder="0"
+                        />
+                      </div>
+                      <div className="calculated-value">
+                        <label>Total Bulk Samples</label>
+                        <div className="value-display">
+                          {isRooms 
+                            ? Math.round(asbestosTotals.bulkSummaries[component])
+                            : asbestosTotals.bulkSummaries[component].toFixed(2)}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               <div className="section-total">
                 <strong>Total PLM: {asbestosTotals.totalPLM.toFixed(2)}</strong>
@@ -556,7 +573,7 @@ const HRSEstimator = () => {
               className="section-header clickable"
               onClick={() => toggleSection('lead')}
             >
-              <h2>🔶 Lead Sampling</h2>
+              <h2>Lead Sampling</h2>
               <span className="toggle-icon">{expandedSections.lead ? '▼' : '▶'}</span>
             </div>
             {expandedSections.lead && (
@@ -570,12 +587,17 @@ const HRSEstimator = () => {
                       <input
                         type="number"
                         min="0"
-                        step="0.01"
+                        step="1"
                         value={data.xrf_shots}
                         onChange={(e) => {
+                          let value = e.target.value;
+                          // Only allow whole numbers
+                          if (value !== '' && !isNaN(value)) {
+                            value = Math.floor(Math.max(0, parseFloat(value) || 0)).toString();
+                          }
                           setLeadData({
                             ...leadData,
-                            [component]: { ...data, xrf_shots: e.target.value }
+                            [component]: { ...data, xrf_shots: value }
                           });
                         }}
                         className="form-input small"
@@ -587,12 +609,17 @@ const HRSEstimator = () => {
                       <input
                         type="number"
                         min="0"
-                        step="0.01"
+                        step="1"
                         value={data.chips_wipes}
                         onChange={(e) => {
+                          let value = e.target.value;
+                          // Only allow whole numbers
+                          if (value !== '' && !isNaN(value)) {
+                            value = Math.floor(Math.max(0, parseFloat(value) || 0)).toString();
+                          }
                           setLeadData({
                             ...leadData,
-                            [component]: { ...data, chips_wipes: e.target.value }
+                            [component]: { ...data, chips_wipes: value }
                           });
                         }}
                         className="form-input small"
@@ -603,8 +630,8 @@ const HRSEstimator = () => {
                 ))}
               </div>
               <div className="section-total">
-                <strong>Total XRF Shots: {leadTotals.totalXRF.toFixed(2)}</strong>
-                <strong>Total Chips/Wipes: {leadTotals.totalChipsWipes.toFixed(2)}</strong>
+                <strong>Total XRF Shots: {Math.round(leadTotals.totalXRF)}</strong>
+                <strong>Total Chips/Wipes: {Math.round(leadTotals.totalChipsWipes)}</strong>
               </div>
             </div>
             )}
@@ -616,7 +643,7 @@ const HRSEstimator = () => {
               className="section-header clickable"
               onClick={() => toggleSection('mold')}
             >
-              <h2>🟢 Mold Sampling</h2>
+              <h2>Mold Sampling</h2>
               <span className="toggle-icon">{expandedSections.mold ? '▼' : '▶'}</span>
             </div>
             {expandedSections.mold && (
@@ -630,12 +657,17 @@ const HRSEstimator = () => {
                       <input
                         type="number"
                         min="0"
-                        step="0.01"
+                        step="1"
                         value={data.tape_lift}
                         onChange={(e) => {
+                          let value = e.target.value;
+                          // Only allow whole numbers
+                          if (value !== '' && !isNaN(value)) {
+                            value = Math.floor(Math.max(0, parseFloat(value) || 0)).toString();
+                          }
                           setMoldData({
                             ...moldData,
-                            [component]: { ...data, tape_lift: e.target.value }
+                            [component]: { ...data, tape_lift: value }
                           });
                         }}
                         className="form-input small"
@@ -647,12 +679,17 @@ const HRSEstimator = () => {
                       <input
                         type="number"
                         min="0"
-                        step="0.01"
+                        step="1"
                         value={data.spore_trap}
                         onChange={(e) => {
+                          let value = e.target.value;
+                          // Only allow whole numbers
+                          if (value !== '' && !isNaN(value)) {
+                            value = Math.floor(Math.max(0, parseFloat(value) || 0)).toString();
+                          }
                           setMoldData({
                             ...moldData,
-                            [component]: { ...data, spore_trap: e.target.value }
+                            [component]: { ...data, spore_trap: value }
                           });
                         }}
                         className="form-input small"
@@ -664,12 +701,17 @@ const HRSEstimator = () => {
                       <input
                         type="number"
                         min="0"
-                        step="0.01"
+                        step="1"
                         value={data.culturable}
                         onChange={(e) => {
+                          let value = e.target.value;
+                          // Only allow whole numbers
+                          if (value !== '' && !isNaN(value)) {
+                            value = Math.floor(Math.max(0, parseFloat(value) || 0)).toString();
+                          }
                           setMoldData({
                             ...moldData,
-                            [component]: { ...data, culturable: e.target.value }
+                            [component]: { ...data, culturable: value }
                           });
                         }}
                         className="form-input small"
@@ -680,9 +722,9 @@ const HRSEstimator = () => {
                 ))}
               </div>
               <div className="section-total">
-                <strong>Total Tape Lift: {moldTotals.totalTapeLift.toFixed(2)}</strong>
-                <strong>Total Spore Trap: {moldTotals.totalSporeTrap.toFixed(2)}</strong>
-                <strong>Total Culturable: {moldTotals.totalCulturable.toFixed(2)}</strong>
+                <strong>Total Tape Lift: {Math.round(moldTotals.totalTapeLift)}</strong>
+                <strong>Total Spore Trap: {Math.round(moldTotals.totalSporeTrap)}</strong>
+                <strong>Total Culturable: {Math.round(moldTotals.totalCulturable)}</strong>
               </div>
             </div>
             )}
@@ -694,7 +736,7 @@ const HRSEstimator = () => {
               className="section-header clickable"
               onClick={() => toggleSection('orm')}
             >
-              <h2>⚪ Other Regulated Materials (ORM)</h2>
+              <h2>Other Regulated Materials</h2>
               <span className="toggle-icon">{expandedSections.orm ? '▼' : '▶'}</span>
             </div>
             {expandedSections.orm && (
@@ -744,7 +786,7 @@ const HRSEstimator = () => {
                 placeholder="1"
               />
               <small style={{ fontSize: '0.85rem', color: '#666', marginTop: '4px', display: 'block' }}>
-                Number of field staff members for efficiency calculation. This will create {fieldStaffCount} staff row{parseInt(fieldStaffCount) !== 1 ? 's' : ''} below.
+                How many people will be doing the field work? This helps calculate how long the job will take.
               </small>
             </div>
           </div>
@@ -756,13 +798,12 @@ const HRSEstimator = () => {
                 Select Staff Roles
               </h3>
               <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '10px' }}>
-                Assign roles to your {fieldStaffCount} staff member{parseInt(fieldStaffCount) !== 1 ? 's' : ''}. 
-                You can group staff by role (e.g., 2 Env. Scientists in one row, 1 Env. Technician in another). 
-                The total count across all rows should equal {fieldStaffCount}.
+                Tell us what roles your {fieldStaffCount} staff member{parseInt(fieldStaffCount) !== 1 ? 's' : ''} will have. 
+                You can add multiple people with the same role (for example, 2 Environmental Scientists and 1 Technician).
               </p>
               {totalStaff !== parseInt(fieldStaffCount) && totalStaff > 0 && (
                 <div style={{ 
-                  padding: '10px', 
+                  padding: '12px', 
                   background: '#fff3cd', 
                   border: '1px solid #ffc107', 
                   borderRadius: '6px',
@@ -770,7 +811,7 @@ const HRSEstimator = () => {
                   fontSize: '0.9rem',
                   color: '#856404'
                 }}>
-                  ⚠️ Total staff count ({totalStaff}) doesn't match Field Staff Count ({fieldStaffCount}). Please adjust the counts below.
+                  <strong>Note:</strong> The total staff count ({totalStaff}) doesn't match the number you entered above ({fieldStaffCount}). Please adjust the counts below to match.
                 </div>
               )}
             </div>
@@ -789,7 +830,7 @@ const HRSEstimator = () => {
               className="section-header clickable"
               onClick={() => setExpandedSections(prev => ({ ...prev, laborCategories: !prev.laborCategories }))}
             >
-              <h2>💰 Additional Labor Categories</h2>
+              <h2>Additional Labor Hours</h2>
               <span className="toggle-icon">{expandedSections.laborCategories ? '▼' : '▶'}</span>
             </div>
             {expandedSections.laborCategories && (
@@ -886,7 +927,7 @@ const HRSEstimator = () => {
               className="section-header clickable"
               onClick={() => setShowAdvanced(!showAdvanced)}
             >
-              <h2>⚙️ Advanced Settings</h2>
+              <h2>Advanced Settings</h2>
               <span className="toggle-icon">{showAdvanced ? '▼' : '▶'}</span>
             </div>
             {showAdvanced && (
@@ -959,7 +1000,7 @@ const HRSEstimator = () => {
           {/* Error Display */}
           {error && (
             <div className="error-message">
-              <p>⚠️ {error}</p>
+              <p><strong>Error:</strong> {error}</p>
             </div>
           )}
         </form>
@@ -986,7 +1027,7 @@ const HRSEstimator = () => {
             {/* Staff Labor Cost Breakdown */}
             {(estimationResult.staff_breakdown && estimationResult.staff_breakdown.length > 0 && estimationResult.staff_labor_costs) && (
               <div className="category-breakdown">
-                <h3>👥 Staff Labor Cost Breakdown</h3>
+                <h3>Staff Labor Cost Breakdown</h3>
                 <table className="staff-breakdown-table">
                   <thead>
                     <tr>

@@ -411,7 +411,7 @@ const LabTests = () => {
     return (
       <div className="error-container">
         <div className="error-message">
-          <h2>⚠️ Error</h2>
+          <h2>Error</h2>
           <p>{error}</p>
           <button onClick={fetchLabs} className="retry-btn">
             Retry
@@ -428,7 +428,7 @@ const LabTests = () => {
     return (
       <div className="no-data-container">
         <div className="no-data-message">
-          <h2>📋 No Laboratories Available</h2>
+          <h2>No Laboratories Available</h2>
           <p>No laboratories found. Click below to seed sample data.</p>
           <button onClick={handleSeedData} className="seed-btn">
             Seed Sample Data
@@ -442,7 +442,7 @@ const LabTests = () => {
     return (
       <div className="no-data-container">
         <div className="no-data-message">
-          <h2>📋 No Laboratories Available</h2>
+          <h2>No Laboratories Available</h2>
           <p>No laboratories found. Click below to seed sample data.</p>
           <button onClick={handleSeedData} className="seed-btn">
             Seed Sample Data
@@ -456,21 +456,21 @@ const LabTests = () => {
     <div className="lab-tests-container">
       <nav className="lab-tests-nav">
         <Link to="/" className="nav-link">
-          🏠 Home
+          Home
         </Link>
         <div className="nav-title">
-          <h1>🧪 Lab Test Services</h1>
+          <h1>Lab Fee Calculator</h1>
         </div>
         <button 
           className="add-category-btn"
           onClick={() => setShowAddCategoryModal(true)}
         >
-          ➕ Add New Category
+          Add New Category
         </button>
       </nav>
       
       <header className="lab-tests-header">
-        <p>Comprehensive laboratory testing services with flexible turnaround times</p>
+        <p>Calculate costs for laboratory testing services</p>
       </header>
 
       {/* Project Header with Navigation */}
@@ -699,7 +699,7 @@ const LabTests = () => {
       {Object.values(quantities).some(q => q > 0) && (
         <div className="total-cost-summary">
           <div className="summary-container">
-            <h3>💰 Order Summary</h3>
+            <h3>Order Summary</h3>
             <div className="summary-details">
               <div className="summary-item">
                 <span>Total Cost:</span>
@@ -743,7 +743,7 @@ const LabTests = () => {
         <div style={{ maxWidth: '1200px', margin: '30px auto', padding: '0 20px' }}>
           <div style={{ background: 'white', padding: '25px', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ color: '#2c3e50', margin: 0 }}>👥 Field Collection Staff</h3>
+              <h3 style={{ color: '#2c3e50', margin: 0 }}>Field Collection Staff</h3>
               <button
                 onClick={() => setShowStaffSection(!showStaffSection)}
                 style={{
@@ -764,7 +764,7 @@ const LabTests = () => {
             {showStaffSection && (
               <div>
                 <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '20px' }}>
-                  Assign staff roles and hours for collecting the samples. This will calculate labor costs for field collection.
+                  Add staff who will collect the samples. Enter their role, how many people, and how many hours each person will work.
                 </p>
                 
                 <div style={{ marginBottom: '20px' }}>
@@ -837,20 +837,39 @@ const LabTests = () => {
                         
                         <button
                           type="button"
-                          onClick={() => handleRemoveStaffRow(index)}
-                          disabled={staffRows.length === 1}
-                          style={{
+                          onClick={() => {
+                            if (row.role) {
+                              // Clear the selection (delete function)
+                              const newRows = [...staffRows];
+                              newRows[index] = { role: '', count: 1, hours_per_person: 0 };
+                              setStaffRows(newRows);
+                            } else {
+                              // Remove the row if no role selected
+                              handleRemoveStaffRow(index);
+                            }
+                          }}
+                          className={row.role ? 'delete-staff-btn' : ''}
+                          style={!row.role ? {
                             padding: '8px 12px',
                             background: staffRows.length === 1 ? '#ccc' : '#e74c3c',
                             color: 'white',
                             border: 'none',
                             borderRadius: '6px',
-                            cursor: staffRows.length === 1 ? 'not-allowed' : 'pointer',
-                            fontSize: '1rem',
+                            cursor: staffRows.length > 1 ? 'pointer' : 'not-allowed',
+                            fontSize: '0.9rem',
                             fontWeight: 'bold'
-                          }}
+                          } : {}}
+                          disabled={!row.role && staffRows.length === 1}
+                          title={row.role ? 'Delete selected staff' : 'Remove row'}
                         >
-                          ✕
+                          {row.role ? (
+                            <>
+                              <span>🗑️</span>
+                              <span>Delete</span>
+                            </>
+                          ) : (
+                            '✕'
+                          )}
                         </button>
                         
                         {row.role && row.count > 0 && row.hours_per_person > 0 && rate && (
@@ -877,7 +896,7 @@ const LabTests = () => {
                       marginTop: '10px'
                     }}
                   >
-                    ➕ Add Staff Row
+                    Add Another Staff Member
                   </button>
                 </div>
               </div>
@@ -896,7 +915,7 @@ const LabTests = () => {
           return (
             <div className="order-summary-container">
               <div className="order-summary-card">
-                <h3>🧾 Order Summary</h3>
+                <h3>Order Summary</h3>
                 <div className="order-summary-details">
                   {/* Breakdown by test and turnaround time */}
                   {breakdown.length > 0 && (

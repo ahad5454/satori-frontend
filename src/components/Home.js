@@ -31,11 +31,11 @@ const Home = () => {
             </div>
           </div>
           <div className="hero-actions">
-            <Link to="/lab-fees" className="cta-button primary">
-              Lab Fee Calculator
-            </Link>
-            <Link to="/hrs-estimator" className="cta-button secondary">
+            <Link to="/hrs-estimator" className="cta-button primary">
               HRS Sample Estimator
+            </Link>
+            <Link to="/lab-fees" className="cta-button secondary">
+              Lab Fee Calculator
             </Link>
             <Link to="/logistics" className="cta-button secondary">
               Logistics Estimator
@@ -118,11 +118,11 @@ const Home = () => {
           <h3>Ready to Get Started?</h3>
           <p>Access our ERP tools to manage lab fees and estimate field hours for your environmental projects</p>
           <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link to="/lab-fees" className="cta-button primary">
-              Lab Fee Calculator
-            </Link>
             <Link to="/hrs-estimator" className="cta-button primary">
               HRS Sample Estimator
+            </Link>
+            <Link to="/lab-fees" className="cta-button primary">
+              Lab Fee Calculator
             </Link>
             <Link to="/logistics" className="cta-button primary">
               Logistics Estimator

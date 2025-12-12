@@ -62,7 +62,7 @@ const LogisticsEstimationsList = () => {
       <div className="logistics-container">
         <div className="error-container">
           <div className="error-message">
-            <h2>⚠️ Error</h2>
+            <h2>Error</h2>
             <p>{error}</p>
             <button onClick={fetchEstimations} className="retry-btn">
               Retry
@@ -77,10 +77,10 @@ const LogisticsEstimationsList = () => {
     <div className="logistics-container">
       <nav className="logistics-nav">
         <Link to="/" className="nav-link">
-          🏠 Home
+          Home
         </Link>
         <div className="nav-title">
-          <h1>📋 Previous Logistics Estimates</h1>
+          <h1>Previous Logistics Estimates</h1>
         </div>
         <button 
           className="view-estimations-btn"
@@ -123,7 +123,7 @@ const LogisticsEstimationsList = () => {
                       <div className="summary-item">
                         <span className="summary-label">Site Access Mode:</span>
                         <span className="summary-value">
-                          {estimation.site_access_mode === 'driving' ? '🚗 Driving' : '✈️ Flight'}
+                          {estimation.site_access_mode === 'driving' ? 'Driving' : 'Flight'}
                         </span>
                       </div>
                       <div className="summary-item">
@@ -181,7 +181,7 @@ const LogisticsEstimationsList = () => {
                         navigate('/logistics', { state: { estimationData: estimation, showResults: true } });
                       }}
                     >
-                      👁️ View Details
+                      View Details
                     </button>
                   </div>
                 </div>

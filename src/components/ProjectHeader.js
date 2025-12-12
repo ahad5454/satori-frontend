@@ -18,19 +18,19 @@ const ProjectHeader = ({ projectName, moduleName, onProjectNameChange }) => {
           className={`nav-module-btn ${moduleName === 'hrs' ? 'active' : ''}`}
           onClick={() => navigate('/hrs-estimator')}
         >
-          📊 HRS Sample Estimator
+          HRS Sample Estimator
         </button>
         <button
           className={`nav-module-btn ${moduleName === 'lab' ? 'active' : ''}`}
           onClick={() => navigate('/lab-fees')}
         >
-          🧪 Lab Fee Calculator
+          Lab Fee Calculator
         </button>
         <button
           className={`nav-module-btn ${moduleName === 'logistics' ? 'active' : ''}`}
           onClick={() => navigate('/logistics')}
         >
-          🚚 Logistics Estimator
+          Logistics Estimator
         </button>
       </div>
     </div>

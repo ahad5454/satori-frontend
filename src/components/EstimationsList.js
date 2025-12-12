@@ -55,7 +55,7 @@ const EstimationsList = () => {
       <div className="hrs-estimator-container">
         <div className="error-container">
           <div className="error-message">
-            <h2>⚠️ Error</h2>
+            <h2>Error</h2>
             <p>{error}</p>
             <button onClick={fetchEstimations} className="retry-btn">
               Retry
@@ -70,10 +70,10 @@ const EstimationsList = () => {
     <div className="hrs-estimator-container">
       <nav className="hrs-estimator-nav">
         <Link to="/" className="nav-link">
-          🏠 Home
+          Home
         </Link>
         <div className="nav-title">
-          <h1>📋 Previous Estimations</h1>
+          <h1>Previous Estimations</h1>
         </div>
         <button 
           className="view-estimations-btn"
@@ -172,7 +172,7 @@ const EstimationsList = () => {
                         console.log('Full estimation data:', estimation);
                       }}
                     >
-                      👁️ View Details
+                      View Details
                     </button>
                   </div>
                 </div>
