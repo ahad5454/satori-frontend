@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { hrsEstimatorAPI } from '../services/api';
+import { hrsEstimatorAPI, estimateSnapshotAPI } from '../services/api';
 import StaffRows from './StaffRows';
 import ProjectHeader from './ProjectHeader';
 import './HRSEstimator.css';
@@ -86,6 +86,134 @@ const HRSEstimator = () => {
     }
   }, [projectName]);
 
+  // Load snapshot data when project name is available (for form rehydration)
+  // IMPORTANT: This runs when component mounts OR when switching back to this route
+  // This ensures form data is restored when user switches tabs and comes back
+  useEffect(() => {
+    // Only run if we're actually on the HRS Estimator route
+    if (location.pathname !== '/hrs-estimator') {
+      return;
+    }
+
+    const loadSnapshotData = async () => {
+      if (!projectName) return;
+      
+      try {
+        const snapshot = await estimateSnapshotAPI.getLatestSnapshot(projectName);
+        if (!snapshot || !snapshot.hrs_estimator_data) {
+          // No snapshot data available - form stays empty
+          return;
+        }
+        
+        const hrsData = snapshot.hrs_estimator_data;
+        const inputs = hrsData.inputs || {};
+        const outputs = hrsData.outputs || {};
+        
+        // Rehydrate form fields from saved inputs
+        if (inputs.field_staff_count) {
+          setFieldStaffCount(inputs.field_staff_count);
+        }
+        
+        // Override minutes
+        if (inputs.override_minutes_asbestos !== undefined && inputs.override_minutes_asbestos !== null) {
+          setOverrideMinutes(prev => ({ ...prev, asbestos: inputs.override_minutes_asbestos }));
+        }
+        if (inputs.override_minutes_xrf !== undefined && inputs.override_minutes_xrf !== null) {
+          setOverrideMinutes(prev => ({ ...prev, xrf: inputs.override_minutes_xrf }));
+        }
+        if (inputs.override_minutes_lead !== undefined && inputs.override_minutes_lead !== null) {
+          setOverrideMinutes(prev => ({ ...prev, lead: inputs.override_minutes_lead }));
+        }
+        if (inputs.override_minutes_mold !== undefined && inputs.override_minutes_mold !== null) {
+          setOverrideMinutes(prev => ({ ...prev, mold: inputs.override_minutes_mold }));
+        }
+        
+        // Asbestos lines
+        if (inputs.asbestos_lines && Array.isArray(inputs.asbestos_lines)) {
+          const newAsbestosData = { ...asbestosData };
+          inputs.asbestos_lines.forEach(line => {
+            if (line.component_name && newAsbestosData[line.component_name]) {
+              newAsbestosData[line.component_name] = {
+                actuals: line.actuals?.toString() || '',
+                bulks_per_unit: line.bulks_per_unit?.toString() || '',
+                unit_label: line.unit_label || 'Rooms'
+              };
+            }
+          });
+          setAsbestosData(newAsbestosData);
+        }
+        
+        // Lead lines
+        if (inputs.lead_lines && Array.isArray(inputs.lead_lines)) {
+          const newLeadData = { ...leadData };
+          inputs.lead_lines.forEach(line => {
+            if (line.component_name && newLeadData[line.component_name]) {
+              newLeadData[line.component_name] = {
+                xrf_shots: line.xrf_shots?.toString() || '',
+                chips_wipes: line.chips_wipes?.toString() || ''
+              };
+            }
+          });
+          setLeadData(newLeadData);
+        }
+        
+        // Mold lines
+        if (inputs.mold_lines && Array.isArray(inputs.mold_lines)) {
+          const newMoldData = { ...moldData };
+          inputs.mold_lines.forEach(line => {
+            if (line.component_name && newMoldData[line.component_name]) {
+              newMoldData[line.component_name] = {
+                tape_lift: line.tape_lift?.toString() || '',
+                spore_trap: line.spore_trap?.toString() || '',
+                culturable: line.culturable?.toString() || ''
+              };
+            }
+          });
+          setMoldData(newMoldData);
+        }
+        
+        // ORM
+        if (inputs.orm) {
+          setOrmData({
+            building_total_sf: inputs.orm.building_total_sf?.toString() || '',
+            hours: inputs.orm.hours?.toString() || ''
+          });
+        }
+        
+        // Staff selection
+        if (inputs.staff && Array.isArray(inputs.staff) && inputs.staff.length > 0) {
+          setStaffRows(inputs.staff.map(s => ({ role: s.role || '', count: s.count || 0 })));
+        } else if (inputs.selected_role) {
+          setSelectedRole(inputs.selected_role);
+        }
+        
+        // Manual labor hours
+        if (inputs.manual_labor_hours) {
+          const loadedManualHours = {
+            'Program Manager': inputs.manual_labor_hours['Program Manager']?.toString() || '',
+            'Project Manager': inputs.manual_labor_hours['Project Manager']?.toString() || '',
+            'Accounting': inputs.manual_labor_hours['Accounting']?.toString() || '',
+            'Administrative': inputs.manual_labor_hours['Administrative']?.toString() || '',
+          };
+          setManualLaborHours(loadedManualHours);
+        }
+        
+        // If there are outputs, show the results
+        if (outputs.id) {
+          setEstimationResult(outputs);
+          setShowBreakdown(true);
+        }
+        
+      } catch (error) {
+        console.error('Error loading snapshot data:', error);
+        // Don't show error to user - just proceed with empty form
+      }
+    };
+    
+    loadSnapshotData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectName, location.pathname]);
+
   // Calculate total staff count from staff rows
   const totalStaff = staffRows.reduce((sum, row) => sum + (parseInt(row.count) || 0), 0);
 
@@ -153,9 +281,9 @@ const HRSEstimator = () => {
     const bulkSummaries = {};
     
     Object.entries(asbestosData).forEach(([component, data]) => {
-      const actuals = parseFloat(data.actuals) || 0;
-      const bulksPerUnit = parseFloat(data.bulks_per_unit) || 0;
-      const bulkSummary = actuals * bulksPerUnit;
+      const actuals = parseInt(data.actuals) || 0;
+      const bulksPerUnit = parseInt(data.bulks_per_unit) || 0;
+      const bulkSummary = Math.round(actuals * bulksPerUnit);
       bulkSummaries[component] = bulkSummary;
       totalPLM += bulkSummary;
     });
@@ -169,8 +297,8 @@ const HRSEstimator = () => {
     let totalChipsWipes = 0;
     
     Object.values(leadData).forEach(data => {
-      totalXRF += parseFloat(data.xrf_shots) || 0;
-      totalChipsWipes += parseFloat(data.chips_wipes) || 0;
+      totalXRF += parseInt(data.xrf_shots) || 0;
+      totalChipsWipes += parseInt(data.chips_wipes) || 0;
     });
     
     return { totalXRF, totalChipsWipes };
@@ -183,9 +311,9 @@ const HRSEstimator = () => {
     let totalCulturable = 0;
     
     Object.values(moldData).forEach(data => {
-      totalTapeLift += parseFloat(data.tape_lift) || 0;
-      totalSporeTrap += parseFloat(data.spore_trap) || 0;
-      totalCulturable += parseFloat(data.culturable) || 0;
+      totalTapeLift += parseInt(data.tape_lift) || 0;
+      totalSporeTrap += parseInt(data.spore_trap) || 0;
+      totalCulturable += parseInt(data.culturable) || 0;
     });
     
     return { totalTapeLift, totalSporeTrap, totalCulturable };
@@ -202,23 +330,23 @@ const HRSEstimator = () => {
       const asbestosLines = Object.entries(asbestosData).map(([component_name, data]) => ({
         component_name,
         unit_label: data.unit_label,
-        actuals: parseFloat(data.actuals) || 0,
-        bulks_per_unit: parseFloat(data.bulks_per_unit) || 0,
+        actuals: parseInt(data.actuals) || 0,
+        bulks_per_unit: parseInt(data.bulks_per_unit) || 0,
       }));
 
       // Build lead_lines
       const leadLines = Object.entries(leadData).map(([component_name, data]) => ({
         component_name,
-        xrf_shots: parseFloat(data.xrf_shots) || 0,
-        chips_wipes: parseFloat(data.chips_wipes) || 0,
+        xrf_shots: parseInt(data.xrf_shots) || 0,
+        chips_wipes: parseInt(data.chips_wipes) || 0,
       }));
 
       // Build mold_lines
       const moldLines = Object.entries(moldData).map(([component_name, data]) => ({
         component_name,
-        tape_lift: parseFloat(data.tape_lift) || 0,
-        spore_trap: parseFloat(data.spore_trap) || 0,
-        culturable: parseFloat(data.culturable) || 0,
+        tape_lift: parseInt(data.tape_lift) || 0,
+        spore_trap: parseInt(data.spore_trap) || 0,
+        culturable: parseInt(data.culturable) || 0,
       }));
 
       // Build request payload
@@ -452,7 +580,7 @@ const HRSEstimator = () => {
         </div>
         <button 
           className="view-estimations-btn"
-          onClick={() => navigate('/hrs-estimator/list')}
+          onClick={() => navigate('/previous-estimates')}
         >
           View Previous Estimates
         </button>
@@ -499,8 +627,6 @@ const HRSEstimator = () => {
               <div className="input-grid">
                 {Object.entries(asbestosData).map(([component, data]) => {
                   const isRooms = data.unit_label === 'Rooms';
-                  const stepValue = isRooms ? "1" : "0.01";
-                  
                   return (
                     <div key={component} className="input-row">
                       <div className="component-name">{component}</div>
@@ -509,13 +635,13 @@ const HRSEstimator = () => {
                         <input
                           type="number"
                           min="0"
-                          step={stepValue}
+                          step="1"
                           value={data.actuals}
                           onChange={(e) => {
                             let value = e.target.value;
-                            // For rooms, only allow whole numbers
-                            if (isRooms && value !== '' && !isNaN(value)) {
-                              value = Math.floor(Math.max(0, parseFloat(value) || 0)).toString();
+                            // Only allow whole numbers
+                            if (value !== '' && !isNaN(value)) {
+                              value = Math.floor(Math.max(0, parseInt(value) || 0)).toString();
                             }
                             setAsbestosData({
                               ...asbestosData,
@@ -531,13 +657,13 @@ const HRSEstimator = () => {
                         <input
                           type="number"
                           min="0"
-                          step={stepValue}
+                          step="1"
                           value={data.bulks_per_unit}
                           onChange={(e) => {
                             let value = e.target.value;
-                            // For rooms, only allow whole numbers
-                            if (isRooms && value !== '' && !isNaN(value)) {
-                              value = Math.floor(Math.max(0, parseFloat(value) || 0)).toString();
+                            // Only allow whole numbers
+                            if (value !== '' && !isNaN(value)) {
+                              value = Math.floor(Math.max(0, parseInt(value) || 0)).toString();
                             }
                             setAsbestosData({
                               ...asbestosData,
@@ -551,9 +677,7 @@ const HRSEstimator = () => {
                       <div className="calculated-value">
                         <label>Total Bulk Samples</label>
                         <div className="value-display">
-                          {isRooms 
-                            ? Math.round(asbestosTotals.bulkSummaries[component])
-                            : asbestosTotals.bulkSummaries[component].toFixed(2)}
+                          {Math.round(asbestosTotals.bulkSummaries[component])}
                         </div>
                       </div>
                     </div>
@@ -561,7 +685,7 @@ const HRSEstimator = () => {
                 })}
               </div>
               <div className="section-total">
-                <strong>Total PLM: {asbestosTotals.totalPLM.toFixed(2)}</strong>
+                <strong>Total PLM: {Math.round(asbestosTotals.totalPLM)}</strong>
               </div>
             </div>
             )}
@@ -1204,32 +1328,32 @@ const HRSEstimator = () => {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
                     {estimationResult.total_plm > 0 && (
                       <div style={{ padding: '10px', background: 'white', borderRadius: '6px', border: '1px solid #e0e0e0' }}>
-                        <strong>Total PLM Samples:</strong> {estimationResult.total_plm.toFixed(2)}
+                        <strong>Total PLM Samples:</strong> {Math.round(estimationResult.total_plm)}
                       </div>
                     )}
                     {estimationResult.total_xrf_shots > 0 && (
                       <div style={{ padding: '10px', background: 'white', borderRadius: '6px', border: '1px solid #e0e0e0' }}>
-                        <strong>Total XRF Shots:</strong> {estimationResult.total_xrf_shots.toFixed(2)}
+                        <strong>Total XRF Shots:</strong> {Math.round(estimationResult.total_xrf_shots)}
                       </div>
                     )}
                     {estimationResult.total_chips_wipes > 0 && (
                       <div style={{ padding: '10px', background: 'white', borderRadius: '6px', border: '1px solid #e0e0e0' }}>
-                        <strong>Total Chips/Wipes:</strong> {estimationResult.total_chips_wipes.toFixed(2)}
+                        <strong>Total Chips/Wipes:</strong> {Math.round(estimationResult.total_chips_wipes)}
                       </div>
                     )}
                     {estimationResult.total_tape_lift > 0 && (
                       <div style={{ padding: '10px', background: 'white', borderRadius: '6px', border: '1px solid #e0e0e0' }}>
-                        <strong>Total Tape Lift:</strong> {estimationResult.total_tape_lift.toFixed(2)}
+                        <strong>Total Tape Lift:</strong> {Math.round(estimationResult.total_tape_lift)}
                       </div>
                     )}
                     {estimationResult.total_spore_trap > 0 && (
                       <div style={{ padding: '10px', background: 'white', borderRadius: '6px', border: '1px solid #e0e0e0' }}>
-                        <strong>Total Spore Trap:</strong> {estimationResult.total_spore_trap.toFixed(2)}
+                        <strong>Total Spore Trap:</strong> {Math.round(estimationResult.total_spore_trap)}
                       </div>
                     )}
                     {estimationResult.total_culturable > 0 && (
                       <div style={{ padding: '10px', background: 'white', borderRadius: '6px', border: '1px solid #e0e0e0' }}>
-                        <strong>Total Culturable:</strong> {estimationResult.total_culturable.toFixed(2)}
+                        <strong>Total Culturable:</strong> {Math.round(estimationResult.total_culturable)}
                       </div>
                     )}
                   </div>

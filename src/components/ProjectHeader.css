@@ -14,6 +14,54 @@
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
+.project-actions {
+  display: flex;
+  gap: 12px;
+  padding: 12px 24px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.btn-save-close,
+.btn-discard {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-save-close {
+  background: #27ae60;
+  color: white;
+}
+
+.btn-save-close:hover:not(:disabled) {
+  background: #229954;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(39, 174, 96, 0.3);
+}
+
+.btn-discard {
+  background: #e74c3c;
+  color: white;
+}
+
+.btn-discard:hover:not(:disabled) {
+  background: #c0392b;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(231, 76, 60, 0.3);
+}
+
+.btn-save-close:disabled,
+.btn-discard:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .project-label {
   font-weight: 600;
   color: rgba(255, 255, 255, 0.95);

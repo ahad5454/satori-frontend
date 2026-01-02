@@ -1,11 +1,60 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { labFeesAPI } from '../services/api';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { labFeesAPI, estimateSnapshotAPI } from '../services/api';
 import ProjectHeader from './ProjectHeader';
 import './LabTests.css';
 
+/**
+ * HRS to Lab Fees mapping (must match backend HRS_TO_LAB_MAPPING)
+ * 
+ * DATA CONTRACT: Each mapping entry explicitly defines:
+ * - hrs_output_key: The HRS output field name (e.g., "total_plm")
+ * - service_category: The Lab Fees service category name
+ * - test_name: The Lab Fees test name
+ * - turnaround: The turnaround time label
+ * 
+ * This is a data contract, not a naming convention. The hrs_output_key
+ * is explicitly defined to avoid brittle assumptions about key names.
+ */
+const HRS_TO_LAB_MAPPING = {
+  "asbestos": {
+    "hrs_output_key": "total_plm",
+    "service_category": "PLM - Bulk Building Materials",
+    "test_name": "EPA/600/R-93/116 (<1%)",
+    "turnaround": "24 hr"
+  },
+  "lead_chips_wipes": {
+    "hrs_output_key": "total_chips_wipes",
+    "service_category": "Lead Laboratory Services",
+    "test_name": "Paint Chips (SW-846-7000B)",
+    "turnaround": "24 hr"
+  },
+  "mold_tape_lift": {
+    "hrs_output_key": "total_tape_lift",
+    "service_category": "Mold Related Services - EMLab P&K",
+    "test_name": "Direct Microscopic Examination",
+    "turnaround": "Standard"
+  },
+  "mold_spore_trap": {
+    "hrs_output_key": "total_spore_trap",
+    "service_category": "Mold Related Services - EMLab P&K",
+    "test_name": "Spore Trap Analysis",
+    "turnaround": "Standard"
+  },
+  "mold_culturable": {
+    "hrs_output_key": "total_culturable",
+    "service_category": "Mold Related Services - EMLab P&K",
+    "test_name": "Culturable air fungi speciation",
+    "turnaround": "Standard"
+  }
+  // Note: "lead_xrf" is intentionally omitted here as it has empty service_category
+  // and test_name. It represents field analysis, not a lab test, so it should not
+  // appear in Lab Fees.
+};
+
 const LabTests = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [labs, setLabs] = useState([]);
   const [selectedLab, setSelectedLab] = useState(null); // Currently selected laboratory
   const [categories, setCategories] = useState([]); // Categories for selected lab
@@ -28,6 +77,15 @@ const LabTests = () => {
   const [showStaffSection, setShowStaffSection] = useState(false);
   const [hrsEstimationId, setHrsEstimationId] = useState(null);
 
+  // HRS import state (explicit, user-driven model)
+  const [hrsDataAvailable, setHrsDataAvailable] = useState(false);
+  const [hrsDataChanged, setHrsDataChanged] = useState(false);
+  const [importedHrsSnapshotId, setImportedHrsSnapshotId] = useState(null); // Track which HRS snapshot was imported
+  // CRITICAL: Row-level locking - track which specific quantity keys are derived from HRS
+  // This allows manual entry of additional tests while keeping HRS-derived rows read-only
+  // Format: Set of quantity keys (e.g., "EPA/600/R-93/116 (<1%)-24 hr") that are derived
+  const [derivedQuantityKeys, setDerivedQuantityKeys] = useState(new Set()); // Track which specific rows are derived
+
   // Load project name from localStorage on mount
   useEffect(() => {
     const savedProjectName = localStorage.getItem('currentProjectName');
@@ -43,48 +101,327 @@ const LabTests = () => {
     }
   }, [projectName]);
 
-  useEffect(() => {
-    fetchLabs();
-    fetchLaborRates();
-  }, []);
+  /**
+   * Generic, mapping-driven derivation of Lab Fees quantities from HRS outputs.
+   * 
+   * This function iterates over HRS_TO_LAB_MAPPING (not hardcoded cases) and:
+   * 1. For each mapping entry, uses the explicit hrs_output_key to get the HRS total value
+   * 2. If HRS total exists, is a number, and > 0:
+   *    - Validates mapping has required fields (service_category, test_name, turnaround)
+   *    - Selects the mapped service_category, test_name, and turnaround
+   *    - Sets quantity equal to HRS total
+   *    - Marks as derived (read-only)
+   * 
+   * IDEMPOTENCY: This function returns a complete set of derived quantities.
+   * The caller must clear and rebuild all quantities (no merging) to ensure consistency.
+   * 
+   * This is the ONLY way quantities should be set - from HRS data, never from defaults.
+   * Future mappings added to HRS_TO_LAB_MAPPING will work automatically without code changes.
+   * 
+   * @param {Object} hrsOutputs - HRS estimator outputs containing total_plm, total_chips_wipes, etc.
+   * @param {Array} categories - Lab Fees categories with tests and rates
+   * @returns {Object} Derived quantities object with keys like "Test Name-Turnaround": quantity
+   */
+  const deriveLabFeesFromHRS = (hrsOutputs, categories) => {
+    if (!hrsOutputs || !categories || categories.length === 0) {
+      return {};
+    }
 
-  // Fetch labor rates
-  const fetchLaborRates = async () => {
+    const derivedQuantities = {};
+    
+    // GENERIC RULE: Iterate over HRS_TO_LAB_MAPPING (not hardcoded cases)
+    // This ensures future mappings work automatically without code changes
+    Object.entries(HRS_TO_LAB_MAPPING).forEach(([mappingKey, mapping]) => {
+      // Skip entries with empty service_category or test_name
+      // Example: "lead_xrf" has empty fields and represents field analysis, not a lab test
+      if (!mapping.service_category || !mapping.test_name || !mapping.turnaround) {
+        // Intentionally skipped - this mapping does not represent a lab test
+        return;
+      }
+
+      // Use explicit hrs_output_key (data contract, not derived from key name)
+      const hrsOutputKey = mapping.hrs_output_key;
+      if (!hrsOutputKey) {
+        console.warn(`Mapping "${mappingKey}" missing hrs_output_key field`);
+        return;
+      }
+
+      // Get the HRS total value using the explicit key
+      const hrsValue = hrsOutputs[hrsOutputKey];
+      
+      // GENERIC RULE: If HRS total exists, is a number, and > 0, derive Lab Fees
+      if (hrsValue !== null && hrsValue !== undefined && typeof hrsValue === 'number' && hrsValue > 0) {
+        // Find the matching test in categories using mapped service_category and test_name
+        categories.forEach(category => {
+          if (category.name === mapping.service_category && category.tests) {
+            category.tests.forEach(test => {
+              if (test.name === mapping.test_name && test.rates) {
+                // Find the rate with matching turnaround time
+                test.rates.forEach(rate => {
+                  const rateTurnTime = typeof rate.turn_time === 'string' 
+                    ? rate.turn_time 
+                    : rate.turn_time?.label || '';
+                  
+                  if (rateTurnTime === mapping.turnaround) {
+                    // Set quantity equal to HRS total (idempotent: same key = same value)
+                    const key = `${test.name}-${rateTurnTime}`;
+                    derivedQuantities[key] = hrsValue;
+                  }
+                });
+              }
+            });
+          }
+        });
+      }
+    });
+
+    return derivedQuantities;
+  };
+
+  /**
+   * Check if HRS data is available for the active project.
+   * This is used to show the "Import HRS Sample Data" button.
+   * 
+   * DESIGN DECISION: This is explicit, user-driven import model.
+   * We detect HRS availability but do NOT auto-derive.
+   */
+  const checkHrsDataAvailability = useCallback(async () => {
+    if (!projectName) {
+      setHrsDataAvailable(false);
+      setHrsDataChanged(false);
+      return;
+    }
+
     try {
-      const rates = await labFeesAPI.getLaborRates();
-      setLaborRates(rates);
-    } catch (err) {
-      console.error('Error fetching labor rates:', err);
+      const snapshot = await estimateSnapshotAPI.getLatestSnapshot(projectName);
+      if (!snapshot || !snapshot.hrs_estimator_data || !snapshot.hrs_estimator_data.outputs) {
+        setHrsDataAvailable(false);
+        setHrsDataChanged(false);
+        return;
+      }
+
+      const hrsOutputs = snapshot.hrs_estimator_data.outputs;
+      // Check if any HRS output has a value > 0 (using mapping to check relevant fields)
+      let hasData = false;
+      Object.entries(HRS_TO_LAB_MAPPING).forEach(([mappingKey, mapping]) => {
+        if (!mapping.service_category || !mapping.test_name) return;
+        const hrsOutputKey = mapping.hrs_output_key;
+        if (hrsOutputKey && hrsOutputs[hrsOutputKey] && hrsOutputs[hrsOutputKey] > 0) {
+          hasData = true;
+        }
+      });
+
+      setHrsDataAvailable(hasData);
+
+      // Check if HRS data has changed since last import
+      if (importedHrsSnapshotId && snapshot.id !== importedHrsSnapshotId && derivedQuantityKeys.size > 0) {
+        setHrsDataChanged(true);
+      } else {
+        setHrsDataChanged(false);
+      }
+    } catch (error) {
+      console.error('Error checking HRS data availability:', error);
+      setHrsDataAvailable(false);
+      setHrsDataChanged(false);
+    }
+  }, [projectName, importedHrsSnapshotId, derivedQuantityKeys.size]);
+
+  /**
+   * Explicit, user-driven import of HRS sample data into Lab Fees.
+   * 
+   * DESIGN DECISION: This is the ONLY way quantities should be set from HRS.
+   * No automatic derivation - user must explicitly click "Import HRS Sample Data".
+   * 
+   * This function:
+   * 1. Derives Lab Fees quantities using HRS_TO_LAB_MAPPING
+   * 2. For each mapping entry, uses explicit hrs_output_key
+   * 3. If HRS output value exists and > 0, sets quantity = HRS output value
+   * 4. Clears and rebuilds all derived quantities (idempotent)
+   * 5. Marks quantities as derived (read-only)
+   */
+  const handleImportHrsData = async () => {
+    if (!projectName || !categories || categories.length === 0) {
+      alert('Please ensure a project is selected and categories are loaded.');
+      return;
+    }
+
+    try {
+      const snapshot = await estimateSnapshotAPI.getLatestSnapshot(projectName);
+      if (!snapshot || !snapshot.hrs_estimator_data || !snapshot.hrs_estimator_data.outputs) {
+        alert('No HRS sample data available for this project.');
+        return;
+      }
+
+      const hrsOutputs = snapshot.hrs_estimator_data.outputs;
+      const derivedQuantities = deriveLabFeesFromHRS(hrsOutputs, categories);
+
+      // CRITICAL: Derived quantities are REAL order items, not display-only
+      // They are stored in the canonical quantities collection (same as manual entries)
+      // This ensures they are included in:
+      // - Order Summary aggregation
+      // - Save/submit logic
+      // - Snapshot persistence
+      // ROW-LEVEL LOCKING: Only the specific rows derived from HRS are read-only
+      // Manual rows can be added/edited normally - they coexist with derived rows
+      // IDEMPOTENT: Clear and rebuild all derived quantities
+      // This ensures quantities always match HRS outputs exactly
+      console.log('Importing HRS sample data into Lab Fees (explicit user action, mapping-driven):', derivedQuantities);
+      console.log('Derived quantities will be added to canonical order items collection:', Object.keys(derivedQuantities).length, 'items');
+      
+      // Merge derived quantities with existing manual quantities (don't overwrite manual entries)
+      setQuantities(prev => {
+        const merged = { ...prev };
+        Object.entries(derivedQuantities).forEach(([key, value]) => {
+          merged[key] = value; // Derived quantities override any existing values for these keys
+        });
+        return merged;
+      });
+      
+      // Track which keys are derived (for row-level locking)
+      setDerivedQuantityKeys(new Set(Object.keys(derivedQuantities)));
+      setImportedHrsSnapshotId(snapshot.id);
+      setHrsDataChanged(false);
+
+      // Show success message
+      if (Object.keys(derivedQuantities).length > 0) {
+        alert(`Successfully imported ${Object.keys(derivedQuantities).length} test quantity(ies) from HRS Sample Estimator.`);
+      } else {
+        alert('No quantities to import. HRS outputs are all zero.');
+      }
+    } catch (error) {
+      console.error('Error importing HRS data:', error);
+      alert('Failed to import HRS sample data. Please try again.');
     }
   };
 
-  // Listen for HRS estimation completion
+  // Load snapshot data when project name is available (for form rehydration)
+  // DESIGN DECISION: Explicit, user-driven import model
+  // - Rehydrate form structure (lab, categories, tests) from snapshot.inputs
+  // - Rehydrate staff assignments from snapshot.inputs
+  // - Do NOT auto-derive quantities - user must explicitly click "Import HRS Sample Data"
+  // - Check HRS data availability to show import button
   useEffect(() => {
-    const handleHrsEstimationComplete = (event) => {
-      console.log('HRS Estimation completed:', event.detail);
-      if (event.detail?.estimationId) {
-        setHrsEstimationId(event.detail.estimationId);
-        setShowStaffSection(true); // Show staff section when HRS estimation is done
-      }
-      if (selectedLab) {
-        fetchCategoriesForLab(selectedLab.id);
-      }
-    };
-    
-    window.addEventListener('hrs-estimation-complete', handleHrsEstimationComplete);
-    
-    return () => {
-      window.removeEventListener('hrs-estimation-complete', handleHrsEstimationComplete);
-    };
-  }, [selectedLab]);
-
-
-  // Fetch categories when lab is selected
-  useEffect(() => {
-    if (selectedLab) {
-      fetchCategoriesForLab(selectedLab.id);
+    // Only run if we're actually on the Lab Fees route
+    if (location.pathname !== '/lab-fees') {
+      return;
     }
-  }, [selectedLab]);
+
+    const loadSnapshotData = async () => {
+      if (projectName) {
+        try {
+          const snapshot = await estimateSnapshotAPI.getLatestSnapshot(projectName);
+          if (snapshot) {
+            // Rehydrate staff assignments from saved Lab Fees data (separate from quantities)
+            if (snapshot.lab_fees_data && snapshot.lab_fees_data.inputs) {
+              const inputs = snapshot.lab_fees_data.inputs;
+              
+              if (inputs.staff_assignments && Array.isArray(inputs.staff_assignments) && inputs.staff_assignments.length > 0) {
+                setStaffRows(inputs.staff_assignments.map(s => ({
+                  role: s.role || '',
+                  count: s.count || 1,
+                  hours_per_person: s.hours_per_person || 0
+                })));
+                setShowStaffSection(true);
+              }
+              
+              // Rehydrate HRS estimation ID if present
+              if (inputs.hrs_estimation_id) {
+                setHrsEstimationId(inputs.hrs_estimation_id);
+              }
+
+              // Rehydrate quantities from saved order_details
+              // CRITICAL: Only use snapshot.inputs for rehydration - never use snapshot.outputs.hrs_estimator
+              // HRS outputs are ONLY used when user explicitly clicks "Import HRS Sample Data"
+              // order_details format: { testId: { turnTimeId: quantity } }
+              // quantities format: { "testName-turnTime": quantity }
+              // We need to convert order_details back to quantities format
+              if (inputs.order_details && Object.keys(inputs.order_details).length > 0 && categories.length > 0) {
+                const rehydratedQuantities = {};
+                
+                // Convert order_details (testId -> turnTimeId -> quantity) to quantities (testName-turnTime -> quantity)
+                Object.entries(inputs.order_details).forEach(([testId, turnTimeMap]) => {
+                  // Find the test by ID
+                  let foundTest = null;
+                  for (const category of categories) {
+                    if (category.tests) {
+                      foundTest = category.tests.find(t => t.id.toString() === testId);
+                      if (foundTest) break;
+                    }
+                  }
+                  
+                  if (foundTest) {
+                    // For each turnTime in the map
+                    Object.entries(turnTimeMap).forEach(([turnTimeId, quantity]) => {
+                      // Find the rate with this turnTimeId to get the turnTime label
+                      if (foundTest.rates) {
+                        const rate = foundTest.rates.find(r => {
+                          const rateTurnTimeId = r.turn_time_id?.toString() || '';
+                          return rateTurnTimeId === turnTimeId || turnTimeId === '';
+                        });
+                        
+                        if (rate) {
+                          const turnTimeStr = typeof rate.turn_time === 'string' 
+                            ? rate.turn_time 
+                            : rate.turn_time?.label || 'unknown';
+                          const key = `${foundTest.name}-${turnTimeStr}`;
+                          rehydratedQuantities[key] = quantity;
+                        }
+                      }
+                    });
+                  }
+                });
+                
+                // Rehydrate quantities from snapshot.inputs only
+                // Check import metadata stored in inputs (not HRS outputs)
+                const wasImported = inputs.quantities_imported_from_hrs === true;
+                const savedSnapshotId = inputs.imported_hrs_snapshot_id;
+                
+                if (wasImported && savedSnapshotId) {
+                  // Quantities were imported from HRS - restore with import metadata
+                  // ROW-LEVEL LOCKING: Track which specific keys are derived
+                  setQuantities(rehydratedQuantities);
+                  setDerivedQuantityKeys(new Set(Object.keys(rehydratedQuantities)));
+                  setImportedHrsSnapshotId(savedSnapshotId);
+                } else {
+                  // Quantities were manually entered (not imported)
+                  setQuantities(rehydratedQuantities);
+                  setDerivedQuantityKeys(new Set()); // No derived rows
+                  setImportedHrsSnapshotId(null);
+                }
+              } else {
+                // No saved quantities - start empty
+                setQuantities({});
+                setDerivedQuantityKeys(new Set());
+                setImportedHrsSnapshotId(null);
+              }
+            }
+
+            // Check HRS data availability (for showing import button)
+            // This does NOT auto-derive - it only checks availability
+            await checkHrsDataAvailability();
+          } else {
+            // No snapshot - reset state
+            setHrsDataAvailable(false);
+            setHrsDataChanged(false);
+          }
+        } catch (error) {
+          console.error('Error loading Lab Fees snapshot data:', error);
+        }
+      } else {
+        // No project - reset everything
+        setQuantities({});
+        setStaffRows([{ role: '', count: 1, hours_per_person: 0 }]);
+        setShowStaffSection(false);
+        setHrsEstimationId(null);
+        setHrsDataAvailable(false);
+        setHrsDataChanged(false);
+        setDerivedQuantityKeys(new Set());
+        setImportedHrsSnapshotId(null);
+      }
+    };
+    
+    loadSnapshotData();
+  }, [projectName, categories, location.pathname, checkHrsDataAvailability]); // location.pathname triggers on route change
 
   const fetchLabs = async () => {
     try {
@@ -109,6 +446,58 @@ const LabTests = () => {
     }
   };
 
+  useEffect(() => {
+    fetchLabs();
+    
+    // Fetch labor rates on mount - exactly like HRS Estimator
+    const fetchLaborRates = async () => {
+      try {
+        const rates = await labFeesAPI.getLaborRates();
+        console.log('Labor rates fetched:', rates);
+        setLaborRates(rates);
+      } catch (err) {
+        console.error('Error fetching labor rates:', err);
+      }
+    };
+    fetchLaborRates();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Listen for HRS estimation completion
+  // DESIGN DECISION: Explicit import model - do NOT auto-derive
+  // When HRS estimation completes, check availability and show import button
+  // Do NOT automatically import - user must explicitly click the button
+  useEffect(() => {
+    const handleHrsEstimationComplete = async (event) => {
+      console.log('HRS Estimation completed:', event.detail);
+      if (event.detail?.estimationId) {
+        setHrsEstimationId(event.detail.estimationId);
+        setShowStaffSection(true); // Show staff section when HRS estimation is done
+        
+        // Check HRS data availability (for showing import button)
+        // Do NOT auto-derive - user must explicitly import
+        await checkHrsDataAvailability();
+      }
+      if (selectedLab) {
+        fetchCategoriesForLab(selectedLab.id);
+      }
+    };
+    
+    window.addEventListener('hrs-estimation-complete', handleHrsEstimationComplete);
+    
+    return () => {
+      window.removeEventListener('hrs-estimation-complete', handleHrsEstimationComplete);
+    };
+  }, [selectedLab, projectName, checkHrsDataAvailability]);
+
+
+  // Fetch categories when lab is selected
+  useEffect(() => {
+    if (selectedLab) {
+      fetchCategoriesForLab(selectedLab.id);
+    }
+  }, [selectedLab]);
+
   const fetchCategoriesForLab = async (labId) => {
     try {
       console.log('Fetching categories for lab:', labId);
@@ -129,7 +518,7 @@ const LabTests = () => {
                   ...rate,
                   turn_time: rate.turn_time.label,
                   hours: rate.turn_time.hours,
-                  sample_count: rate.sample_count || null // Preserve sample_count from API
+                  sample_count: null // Never use sample_count from API - quantities come from HRS outputs only
                 }))
               };
             })
@@ -155,6 +544,13 @@ const LabTests = () => {
         setSelectedCategory(null);
         setSelectedTest(null);
       }
+
+      // After categories load, check HRS data availability (for showing import button)
+      // DESIGN DECISION: Explicit import model - do NOT auto-derive
+      // We only check availability, user must explicitly click "Import HRS Sample Data"
+      if (projectName && categoriesWithTests.length > 0) {
+        checkHrsDataAvailability();
+      }
     } catch (err) {
       console.error('Error fetching categories:', err);
       setError(`Failed to load categories: ${err.message || err.toString()}`);
@@ -165,7 +561,19 @@ const LabTests = () => {
     setSelectedLab(lab);
     setSelectedCategory(null);
     setSelectedTest(null);
-    setQuantities({});
+    // ROW-LEVEL LOCKING: Only clear quantities for non-derived rows
+    // Preserve derived quantities (they're read-only anyway)
+    setQuantities(prev => {
+      const filtered = {};
+      Object.entries(prev).forEach(([key, value]) => {
+        if (derivedQuantityKeys.has(key)) {
+          // Preserve derived quantities
+          filtered[key] = value;
+        }
+        // Non-derived quantities are cleared when changing lab
+      });
+      return filtered;
+    });
     setSelectedTurnTime(null);
   };
 
@@ -184,7 +592,19 @@ const LabTests = () => {
   const handleCategoryChange = (category) => {
     setSelectedCategory(category);
     setSelectedTest(null);
-    setQuantities({});
+    // ROW-LEVEL LOCKING: Only clear quantities for non-derived rows
+    // Preserve derived quantities (they're read-only anyway)
+    setQuantities(prev => {
+      const filtered = {};
+      Object.entries(prev).forEach(([key, value]) => {
+        if (derivedQuantityKeys.has(key)) {
+          // Preserve derived quantities
+          filtered[key] = value;
+        }
+        // Non-derived quantities are cleared when changing category
+      });
+      return filtered;
+    });
     setSelectedTurnTime(null);
     
     // If category has tests, select the first one
@@ -216,66 +636,76 @@ const LabTests = () => {
     }));
   };
 
-  const calculateTotalCost = () => {
-    let total = 0;
-    Object.entries(quantities).forEach(([key, quantity]) => {
-      if (quantity > 0) {
-        const [testName, turnTime] = key.split('-');
-        // Find the test in the selected category
-        let foundTest = null;
-        if (selectedCategory && selectedCategory.tests) {
-          foundTest = selectedCategory.tests.find(t => t.name === testName);
-        }
-        if (foundTest) {
-          // Find the rate for the specific turnaround time
-          const rate = foundTest.rates?.find(r => {
-            const rateTurnTime = typeof r.turn_time === 'string' ? r.turn_time : r.turn_time?.label || 'unknown';
-            return rateTurnTime === turnTime;
-          });
-          if (rate) {
-            total += rate.price * quantity;
-          }
-        }
-      }
-    });
-    return total;
-  };
 
-  // Calculate totals from sample_count across all categories and tests
+  // Calculate totals from quantities (derived from HRS outputs or manually entered)
+  // CRITICAL: quantities is the canonical order items collection
+  // Derived rows from HRS import are real order items, not display-only
+  // They are stored in quantities state just like manual entries
+  // The only difference is derivedQuantityKeys Set (for row-level locking) and read-only quantity inputs
+  // NOTE: Do NOT use rate.sample_count - quantities are the source of truth
   const calculateOrderSummary = () => {
     let totalSamples = 0;
     let totalCost = 0;
     const breakdown = [];
 
-    if (categories && categories.length > 0) {
-      categories.forEach(category => {
-        if (category.tests && category.tests.length > 0) {
-          category.tests.forEach(test => {
-            if (test.rates && test.rates.length > 0) {
-              test.rates.forEach(rate => {
-                const sampleCount = rate.sample_count || 0;
-                if (sampleCount > 0) {
-                  const turnTimeStr = typeof rate.turn_time === 'string' ? rate.turn_time : rate.turn_time?.label || 'unknown';
-                  const rateCost = sampleCount * (rate.price || 0);
-                  
-                  totalSamples += sampleCount;
-                  totalCost += rateCost;
-                  
-                  breakdown.push({
-                    categoryName: category.name,
-                    testName: test.name,
-                    turnTime: turnTimeStr,
-                    sampleCount: sampleCount,
-                    price: rate.price || 0,
-                    cost: rateCost
-                  });
-                }
-              });
-            }
-          });
+    // CRITICAL: Sum ALL quantities in the canonical collection
+    // No special-case filtering - derived and manual items are treated identically
+    // This ensures Order Summary reflects the true total cost
+    Object.entries(quantities).forEach(([key, quantity]) => {
+      if (quantity > 0) {
+        // Split key: format is "testName-turnTime"
+        // Use lastIndexOf to handle test names that might contain hyphens
+        const lastDashIndex = key.lastIndexOf('-');
+        if (lastDashIndex === -1) {
+          console.warn(`Order Summary: Invalid quantity key format: "${key}"`);
+          return;
         }
-      });
-    }
+        const testName = key.substring(0, lastDashIndex);
+        const turnTime = key.substring(lastDashIndex + 1);
+        
+        // Search across ALL categories to find the test
+        // Derived quantities may be in different categories than selectedCategory
+        let found = false;
+        for (const category of categories) {
+          if (category.tests) {
+            for (const test of category.tests) {
+              if (test.name === testName && test.rates) {
+                for (const rate of test.rates) {
+                  const rateTurnTime = typeof rate.turn_time === 'string' 
+                    ? rate.turn_time 
+                    : rate.turn_time?.label || 'unknown';
+                  
+                  if (rateTurnTime === turnTime) {
+                    const rateCost = quantity * (rate.price || 0);
+                    totalSamples += quantity;
+                    totalCost += rateCost;
+                    
+                    breakdown.push({
+                      categoryName: category.name,
+                      testName: test.name,
+                      turnTime: turnTime,
+                      sampleCount: quantity,
+                      price: rate.price || 0,
+                      cost: rateCost
+                    });
+                    found = true;
+                    break;
+                  }
+                }
+                if (found) break;
+              }
+            }
+            if (found) break;
+          }
+        }
+        
+        // Log warning if quantity exists but test/rate not found (debugging)
+        if (!found && categories.length > 0) {
+          console.warn(`Order Summary: Could not find test/rate for "${testName}" / "${turnTime}". Available categories:`, 
+            categories.map(c => c.name).join(', '));
+        }
+      }
+    });
 
     return { totalSamples, totalCost, breakdown };
   };
@@ -353,21 +783,40 @@ const LabTests = () => {
       calculateOrderSummary(); // Calculate to get order details
       calculateStaffCosts(); // Calculate to get staff costs
 
-      // Build order details from sample_count
+      // Build order details from quantities (derived from HRS outputs or manually entered)
+      // CRITICAL: quantities is the canonical order items collection
+      // All items (derived or manual) are included in persistence
+      // NOTE: Do NOT use rate.sample_count - quantities state is the source of truth
       const orderDetails = {};
-      categories.forEach(category => {
-        if (category.tests) {
-          category.tests.forEach(test => {
-            if (test.rates) {
-              test.rates.forEach(rate => {
-                if (rate.sample_count > 0) {
-                  const testId = test.id.toString();
-                  const turnTimeId = rate.turn_time_id?.toString() || '';
-                  
-                  if (!orderDetails[testId]) {
-                    orderDetails[testId] = {};
-                  }
-                  orderDetails[testId][turnTimeId] = rate.sample_count;
+      Object.entries(quantities).forEach(([key, quantity]) => {
+        if (quantity > 0) {
+          // Split key: format is "testName-turnTime"
+          // Use lastIndexOf to handle test names that might contain hyphens
+          const lastDashIndex = key.lastIndexOf('-');
+          if (lastDashIndex === -1) return;
+          const testName = key.substring(0, lastDashIndex);
+          const turnTime = key.substring(lastDashIndex + 1);
+          
+          // Find the test and rate to get IDs
+          categories.forEach(category => {
+            if (category.tests) {
+              category.tests.forEach(test => {
+                if (test.name === testName && test.rates) {
+                  test.rates.forEach(rate => {
+                    const rateTurnTime = typeof rate.turn_time === 'string' 
+                      ? rate.turn_time 
+                      : rate.turn_time?.label || 'unknown';
+                    
+                    if (rateTurnTime === turnTime) {
+                      const testId = test.id.toString();
+                      const turnTimeId = rate.turn_time_id?.toString() || '';
+                      
+                      if (!orderDetails[testId]) {
+                        orderDetails[testId] = {};
+                      }
+                      orderDetails[testId][turnTimeId] = quantity;
+                    }
+                  });
                 }
               });
             }
@@ -388,7 +837,11 @@ const LabTests = () => {
         project_name: projectName || null,
         hrs_estimation_id: hrsEstimationId,
         order_details: orderDetails,
-        staff_assignments: staffAssignments
+        staff_assignments: staffAssignments,
+        // Store import metadata in inputs so rehydration doesn't need to check HRS outputs
+        // ROW-LEVEL LOCKING: Track if any quantities were imported (for rehydration)
+        quantities_imported_from_hrs: derivedQuantityKeys.size > 0,
+        imported_hrs_snapshot_id: importedHrsSnapshotId
       };
 
       const result = await labFeesAPI.createOrder(orderData);
@@ -475,6 +928,98 @@ const LabTests = () => {
 
       {/* Project Header with Navigation */}
       <ProjectHeader projectName={projectName} moduleName="lab" />
+
+      {/* HRS Data Changed Warning Banner */}
+      {hrsDataChanged && (
+        <div style={{ 
+          maxWidth: '1200px', 
+          margin: '0 auto 20px', 
+          padding: '0 20px' 
+        }}>
+          <div style={{ 
+            background: '#fff3cd', 
+            border: '2px solid #ffc107', 
+            borderRadius: '8px', 
+            padding: '15px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+          }}>
+            <div style={{ flex: 1 }}>
+              <strong style={{ color: '#856404', display: 'block', marginBottom: '4px' }}>
+                ⚠️ HRS data has changed
+              </strong>
+              <p style={{ color: '#856404', margin: 0, fontSize: '0.9rem' }}>
+                HRS sample data has been updated. Re-import to update Lab Fees quantities.
+              </p>
+            </div>
+            <button
+              onClick={handleImportHrsData}
+              style={{
+                background: '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '10px 20px',
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                marginLeft: '20px',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              Re-import HRS Sample Data
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* HRS Data Available Banner */}
+      {hrsDataAvailable && !hrsDataChanged && (
+        <div style={{ 
+          maxWidth: '1200px', 
+          margin: '0 auto 20px', 
+          padding: '0 20px' 
+        }}>
+          <div style={{ 
+            background: '#d1ecf1', 
+            border: '2px solid #17a2b8', 
+            borderRadius: '8px', 
+            padding: '15px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+          }}>
+            <div style={{ flex: 1 }}>
+              <strong style={{ color: '#0c5460', display: 'block', marginBottom: '4px' }}>
+                ℹ️ HRS sample data available
+              </strong>
+              <p style={{ color: '#0c5460', margin: 0, fontSize: '0.9rem' }}>
+                Import sample quantities from HRS Sample Estimator to populate Lab Fees tests.
+              </p>
+            </div>
+            <button
+              onClick={handleImportHrsData}
+              style={{
+                background: '#28a745',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '10px 20px',
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                marginLeft: '20px',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              Import HRS Sample Data
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Project Name Input */}
       <div style={{ maxWidth: '1200px', margin: '0 auto 20px', padding: '0 20px' }}>
@@ -615,43 +1160,62 @@ const LabTests = () => {
                         const isSelected = selectedTurnTime === turnTimeStr;
                         const totalCost = quantity > 0 ? rate.price * quantity : 0;
                         
+                        // ROW-LEVEL LOCKING: Check if THIS specific row is derived from HRS
+                        // Only derived rows are read-only - manual rows remain fully editable
+                        const quantityKey = `${selectedTest.name}-${turnTimeStr}`;
+                        const isDerivedRow = derivedQuantityKeys.has(quantityKey);
+                        
                         return (
                           <div 
                             key={`${rate.id}-${turnTimeStr}-${rate.hours}`} 
                             className={`pricing-row ${isSelected ? 'selected' : ''}`}
                           >
                             <div className="quantity-controls">
-                              <button 
-                                className="quantity-btn minus-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleQuantityChange(selectedTest.name, turnTimeStr, Math.max(0, quantity - 1));
-                                }}
-                                disabled={quantity <= 0}
-                              >
-                                −
-                              </button>
+                              {/* ROW-LEVEL LOCKING: Only derived rows are read-only */}
+                              {/* Manual rows remain fully editable even after HRS import */}
                               <input
                                 type="number"
                                 min="0"
                                 value={quantity}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  const newQuantity = Math.max(0, parseInt(e.target.value) || 0);
-                                  handleQuantityChange(selectedTest.name, turnTimeStr, newQuantity);
-                                }}
+                                readOnly={isDerivedRow}
+                                disabled={isDerivedRow}
                                 className="quantity-input"
-                                placeholder="0"
-                              />
-                              <button 
-                                className="quantity-btn plus-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleQuantityChange(selectedTest.name, turnTimeStr, quantity + 1);
+                                onChange={(e) => {
+                                  if (!isDerivedRow) {
+                                    // Manual entry - allow editing and mark as non-derived
+                                    handleQuantityChange(selectedTest.name, turnTimeStr, e.target.value);
+                                    // Remove from derived set if it was previously derived (shouldn't happen, but safety)
+                                    if (derivedQuantityKeys.has(quantityKey)) {
+                                      setDerivedQuantityKeys(prev => {
+                                        const next = new Set(prev);
+                                        next.delete(quantityKey);
+                                        return next;
+                                      });
+                                    }
+                                  }
                                 }}
-                              >
-                                +
-                              </button>
+                                style={{ 
+                                  backgroundColor: isDerivedRow ? '#f5f5f5' : 'white', 
+                                  cursor: isDerivedRow ? 'not-allowed' : 'text',
+                                  opacity: isDerivedRow ? 0.7 : 1,
+                                  border: isDerivedRow ? '2px solid #e0e0e0' : '2px solid #ccc'
+                                }}
+                                title={isDerivedRow 
+                                  ? "This quantity is derived from HRS Sample Estimator outputs and cannot be manually edited"
+                                  : "Enter quantity for this test"
+                                }
+                              />
+                              {quantity > 0 && isDerivedRow && (
+                                <span style={{ 
+                                  fontSize: '0.75rem', 
+                                  color: '#27ae60', 
+                                  fontStyle: 'italic',
+                                  marginLeft: '8px',
+                                  fontWeight: 600
+                                }}>
+                                  (from HRS)
+                                </span>
+                              )}
                             </div>
                             <div 
                               className="turn-time"
@@ -696,42 +1260,51 @@ const LabTests = () => {
       </div>
 
       {/* Total Cost Summary */}
-      {Object.values(quantities).some(q => q > 0) && (
-        <div className="total-cost-summary">
-          <div className="summary-container">
-            <h3>Order Summary</h3>
-            <div className="summary-details">
-              <div className="summary-item">
-                <span>Total Cost:</span>
-                <span className="total-cost-amount">{formatPrice(calculateTotalCost())}</span>
+      {Object.values(quantities).some(q => q > 0) && (() => {
+        // CRITICAL: Use calculateOrderSummary() which correctly searches all categories
+        // This ensures derived quantities from HRS import are included in totals
+        // calculateOrderSummary() already has the correct logic that searches across
+        // all categories, not just selectedCategory, so derived rows are included
+        const { totalCost, breakdown } = calculateOrderSummary();
+        return (
+          <div className="total-cost-summary">
+            <div className="summary-container">
+              <h3>Order Summary</h3>
+              <div className="summary-details">
+                <div className="summary-item">
+                  <span>Total Cost:</span>
+                  <span className="total-cost-amount">{formatPrice(totalCost)}</span>
+                </div>
+              </div>
+              <div className="order-breakdown">
+                {breakdown.map((item, index) => (
+                  <div key={`${item.categoryName}-${item.testName}-${item.turnTime}-${index}`} className="breakdown-item">
+                    <span>{item.categoryName} ({selectedLab?.name}): {item.testName} ({item.turnTime}) ×{item.sampleCount}</span>
+                    <span>{formatPrice(item.cost)}</span>
+                  </div>
+                ))}
               </div>
             </div>
-            <div className="order-breakdown">
-              {Object.entries(quantities).map(([key, quantity]) => {
-                if (quantity > 0) {
-                  const [testName, turnTime] = key.split('-');
-                  // Find the test in the selected category
-                  let foundTest = null;
-                  if (selectedCategory && selectedCategory.tests) {
-                    foundTest = selectedCategory.tests.find(t => t.name === testName);
-                  }
-                  const rate = foundTest?.rates?.find(r => {
-                    const rateTurnTime = typeof r.turn_time === 'string' ? r.turn_time : r.turn_time?.label || 'unknown';
-                    return rateTurnTime === turnTime;
-                  });
-                  if (rate) {
-                    return (
-                      <div key={key} className="breakdown-item">
-                        <span>{selectedCategory?.name} ({selectedLab?.name}): {testName} ({turnTime}) ×{quantity}</span>
-                        <span>{formatPrice(rate.price * quantity)}</span>
-                      </div>
-                    );
-                  }
-                }
-                return null;
-              })}
-            </div>
           </div>
+        );
+      })()}
+
+      {/* HRS-derived notice */}
+      {derivedQuantityKeys.size > 0 && Object.keys(quantities).length > 0 && (
+        <div style={{ 
+          maxWidth: '1200px', 
+          margin: '20px auto', 
+          maxWidth: '1200px',
+          margin: '20px auto',
+          padding: '12px 20px',
+          background: '#e8f5e9',
+          border: '2px solid #27ae60',
+          borderRadius: '8px'
+        }}>
+          <p style={{ margin: 0, color: '#2c3e50', fontWeight: 600 }}>
+            ℹ️ Lab Fees quantities are derived from HRS Sample Estimator outputs. 
+            Quantities match HRS totals exactly and cannot be manually edited.
+          </p>
         </div>
       )}
 

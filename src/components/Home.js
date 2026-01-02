@@ -40,6 +40,12 @@ const Home = () => {
             <Link to="/logistics" className="cta-button secondary">
               Logistics Estimator
             </Link>
+            <Link to="/project-summary" className="cta-button secondary">
+              Project Estimate Summary
+            </Link>
+            <Link to="/previous-estimates" className="cta-button secondary">
+              Previous Estimates
+            </Link>
           </div>
         </div>
       </div>

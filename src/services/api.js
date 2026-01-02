@@ -321,4 +321,131 @@ export const logisticsAPI = {
   },
 };
 
+export const projectSummaryAPI = {
+  // Get project estimate summary
+  getEstimateSummary: async (projectName) => {
+    try {
+      console.log('Fetching project estimate summary for:', projectName);
+      const response = await api.get(`/projects/${encodeURIComponent(projectName)}/estimate-summary`);
+      console.log('Get estimate summary response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching estimate summary:', error);
+      throw error;
+    }
+  },
+};
+
+export const estimateSnapshotAPI = {
+  // Get latest (active) snapshot for a project
+  getLatestSnapshot: async (projectName) => {
+    try {
+      console.log('Fetching latest snapshot for:', projectName);
+      const response = await api.get(`/projects/${encodeURIComponent(projectName)}/snapshot/latest`);
+      console.log('Get latest snapshot response:', response);
+      return response.data;
+    } catch (error) {
+      if (error.response?.status === 404) {
+        // No snapshot exists yet - this is OK
+        return null;
+      }
+      console.error('Error fetching latest snapshot:', error);
+      throw error;
+    }
+  },
+
+  // List all snapshots for a project
+  listSnapshots: async (projectName) => {
+    try {
+      console.log('Fetching snapshots for:', projectName);
+      const response = await api.get(`/projects/${encodeURIComponent(projectName)}/snapshots`);
+      console.log('List snapshots response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching snapshots:', error);
+      throw error;
+    }
+  },
+
+  // Get global estimate history (all projects with snapshots)
+  getGlobalHistory: async () => {
+    try {
+      console.log('Fetching global estimate history');
+      const response = await api.get('/snapshots/global');
+      console.log('Global history response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching global history:', error);
+      throw error;
+    }
+  },
+
+  // Get specific snapshot by ID
+  getSnapshot: async (snapshotId) => {
+    try {
+      console.log('Fetching snapshot:', snapshotId);
+      const response = await api.get(`/snapshots/${snapshotId}`);
+      console.log('Get snapshot response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching snapshot:', error);
+      throw error;
+    }
+  },
+
+  // Duplicate active snapshot to create new one
+  duplicateSnapshot: async (projectName, snapshotName = null) => {
+    try {
+      console.log('Duplicating snapshot for:', projectName);
+      const response = await api.post(`/projects/${encodeURIComponent(projectName)}/snapshots/duplicate`, {
+        snapshot_name: snapshotName
+      });
+      console.log('Duplicate snapshot response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error duplicating snapshot:', error);
+      throw error;
+    }
+  },
+
+  // Save & Close Project: Commit current project state
+  saveAndCloseProject: async (projectName) => {
+    try {
+      console.log('Saving and closing project:', projectName);
+      const response = await api.post(`/projects/${encodeURIComponent(projectName)}/snapshot/save-and-close`);
+      console.log('Save and close response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error saving and closing project:', error);
+      throw error;
+    }
+  },
+
+  // Discard Project: Delete all snapshots and summaries for a project
+  discardProject: async (projectName) => {
+    try {
+      console.log('Discarding project:', projectName);
+      const response = await api.delete(`/projects/${encodeURIComponent(projectName)}/discard`);
+      console.log('Discard project response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error discarding project:', error);
+      throw error;
+    }
+  },
+
+  // Delete a specific snapshot
+  deleteSnapshot: async (snapshotId) => {
+    try {
+      console.log('Deleting snapshot:', snapshotId);
+      const response = await api.delete(`/snapshots/${snapshotId}`);
+      console.log('Delete snapshot response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting snapshot:', error);
+      throw error;
+    }
+  },
+};
+
 export default api;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { logisticsAPI } from '../services/api';
+import { logisticsAPI, estimateSnapshotAPI } from '../services/api';
 import DrivingSection from './DrivingSection';
 import FlightsSection from './FlightsSection';
 import RentalSection from './RentalSection';
@@ -133,6 +133,135 @@ const Logistics = () => {
       localStorage.setItem('currentProjectName', projectName);
     }
   }, [projectName]);
+
+  // Load snapshot data when project name is available (for form rehydration)
+  // IMPORTANT: This runs when component mounts OR when switching back to this route
+  // This ensures form data is restored when user switches tabs and comes back
+  useEffect(() => {
+    // Only run if we're actually on the Logistics route
+    if (location.pathname !== '/logistics') {
+      return;
+    }
+
+    const loadSnapshotData = async () => {
+      if (!projectName) return;
+      
+      try {
+        const snapshot = await estimateSnapshotAPI.getLatestSnapshot(projectName);
+        if (!snapshot || !snapshot.logistics_data) {
+          // No snapshot data available - form stays empty
+          return;
+        }
+        
+        const logisticsData = snapshot.logistics_data;
+        const inputs = logisticsData.inputs || {};
+        const outputs = logisticsData.outputs || {};
+        
+        // Rehydrate basic settings
+        if (inputs.site_access_mode) {
+          setSiteAccessMode(inputs.site_access_mode);
+        }
+        if (inputs.is_local_project !== undefined) {
+          setIsLocalProject(inputs.is_local_project);
+        }
+        if (inputs.use_client_vehicle !== undefined) {
+          setUseClientVehicle(inputs.use_client_vehicle);
+        }
+        if (inputs.per_diem_rate !== undefined) {
+          setPerDiemRate(inputs.per_diem_rate);
+        }
+        if (inputs.rate_multiplier !== undefined) {
+          setRateMultiplier(inputs.rate_multiplier);
+        }
+        
+        // Rehydrate staff rows
+        if (inputs.staff && Array.isArray(inputs.staff) && inputs.staff.length > 0) {
+          setStaffRows(inputs.staff.map(s => ({ role: s.role || '', count: s.count || 0 })));
+        }
+        
+        // Rehydrate driving data
+        if (inputs.roundtrip_driving) {
+          setRoundtripDrivingData({
+            project_location: inputs.roundtrip_driving.project_location || '',
+            num_vehicles: inputs.roundtrip_driving.num_vehicles || 1,
+            one_way_miles: inputs.roundtrip_driving.one_way_miles || 0.0,
+            drive_time_hours: inputs.roundtrip_driving.drive_time_hours || null,
+            project_duration_days: inputs.roundtrip_driving.project_duration_days || 0,
+            mpg: inputs.roundtrip_driving.mpg || null,
+            cost_per_gallon: inputs.roundtrip_driving.cost_per_gallon || null,
+            cost_per_mile: inputs.roundtrip_driving.cost_per_mile || null,
+            anchorage_flat_fee: inputs.roundtrip_driving.anchorage_flat_fee || 45,
+          });
+        }
+        
+        if (inputs.daily_driving) {
+          setDailyDrivingData({
+            site_location: inputs.daily_driving.site_location || '',
+            lodging_location: inputs.daily_driving.lodging_location || '',
+            daily_miles: inputs.daily_driving.daily_miles || 0.0,
+            daily_drive_time_hours: inputs.daily_driving.daily_drive_time_hours || null,
+            project_duration_days: inputs.daily_driving.project_duration_days || 0,
+            mpg: inputs.daily_driving.mpg || null,
+            cost_per_gallon: inputs.daily_driving.cost_per_gallon || null,
+            cost_per_mile: inputs.daily_driving.cost_per_mile || null,
+          });
+        }
+        
+        // Rehydrate flights data
+        if (inputs.flights) {
+          setFlightsData({
+            project_location: inputs.flights.project_location || '',
+            num_tickets: inputs.flights.num_tickets || 0,
+            roundtrip_cost_per_ticket: inputs.flights.roundtrip_cost_per_ticket || 0.0,
+            flight_time_hours_one_way: inputs.flights.flight_time_hours_one_way || 0.0,
+            layover_city: inputs.flights.layover_city || '',
+            has_overnight: inputs.flights.has_overnight || false,
+            layover_hotel_name: inputs.flights.layover_hotel_name || '',
+            layover_cost_per_night: inputs.flights.layover_cost_per_night || null,
+            layover_rooms: inputs.flights.layover_rooms || null,
+          });
+        }
+        
+        // Rehydrate rental data
+        if (inputs.rental) {
+          setRentalData({
+            project_location: inputs.rental.project_location || '',
+            num_vehicles: inputs.rental.num_vehicles || 0,
+            vehicle_category: inputs.rental.vehicle_category || '',
+            daily_rate: inputs.rental.daily_rate || null,
+            weekly_rate: inputs.rental.weekly_rate || null,
+            monthly_rate: inputs.rental.monthly_rate || null,
+            rental_period_type: inputs.rental.rental_period_type || '',
+            rental_days: inputs.rental.rental_days || 0,
+            fuel_cost_estimate: inputs.rental.fuel_cost_estimate || null,
+          });
+        }
+        
+        // Rehydrate lodging data
+        if (inputs.lodging) {
+          setLodgingData({
+            project_location: inputs.lodging.project_location || '',
+            hotel_name: inputs.lodging.hotel_name || '',
+            night_cost_with_taxes: inputs.lodging.night_cost_with_taxes || 0.0,
+            project_duration_days: inputs.lodging.project_duration_days || 0,
+            num_staff: inputs.lodging.num_staff || 0,
+          });
+        }
+        
+        // If there are outputs, show the results
+        if (outputs.id) {
+          setEstimationResult(outputs);
+        }
+        
+      } catch (error) {
+        console.error('Error loading snapshot data:', error);
+        // Don't show error to user - just proceed with empty form
+      }
+    };
+    
+    loadSnapshotData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectName, location.pathname]);
 
   // Load estimation data from navigation state if available
   useEffect(() => {
@@ -350,7 +479,7 @@ const Logistics = () => {
         </div>
         <button 
           className="view-estimations-btn"
-          onClick={() => navigate('/logistics/list')}
+          onClick={() => navigate('/previous-estimates')}
         >
           View Previous Estimates
         </button>

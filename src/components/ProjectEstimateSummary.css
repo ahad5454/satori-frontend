@@ -1,0 +1,138 @@
+.summary-container {
+  min-height: 100vh;
+  background-color: #f5f5f5;
+}
+
+.summary-content {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.summary-header {
+  margin-bottom: 2rem;
+}
+
+.summary-header h1 {
+  font-size: 2.5rem;
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+}
+
+.summary-subtitle {
+  color: #666;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.summary-card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 2rem;
+}
+
+.summary-project-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.project-label {
+  font-weight: 600;
+  color: #666;
+}
+
+.project-name-value {
+  font-size: 1.2rem;
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.modules-list {
+  margin-bottom: 2rem;
+}
+
+.module-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  background-color: #f9f9f9;
+  border-radius: 6px;
+  border-left: 4px solid #3498db;
+}
+
+.module-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.module-value {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #27ae60;
+}
+
+.module-value.not-generated {
+  color: #95a5a6;
+  font-style: italic;
+  font-weight: normal;
+}
+
+.grand-total-section {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 3px solid #2c3e50;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.grand-total-label {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.grand-total-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #2c3e50 !important; /* Dark color for visibility on white background */
+}
+
+.summary-note {
+  margin-top: 2rem;
+  padding: 1rem;
+  background-color: #fff3cd;
+  border-left: 4px solid #ffc107;
+  border-radius: 4px;
+}
+
+.summary-note p {
+  margin: 0;
+  color: #856404;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.loading-message,
+.error-message {
+  text-align: center;
+  padding: 3rem;
+  font-size: 1.2rem;
+  color: #666;
+}
+
+.error-message {
+  color: #e74c3c;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
