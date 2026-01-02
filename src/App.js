@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { initializeSession } from './utils/sessionManager';
 import Home from './components/Home';
 import LabTests from './components/LabTests';
 import HRSEstimator from './components/HRSEstimator';
@@ -12,6 +13,11 @@ import SnapshotDetails from './components/SnapshotDetails';
 import './App.css';
 
 function App() {
+  // Initialize session on app mount (runs once per browser session)
+  useEffect(() => {
+    initializeSession();
+  }, []);
+
   return (
     <Router>
       <div className="App">
