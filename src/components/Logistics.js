@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useProject } from '../contexts/ProjectContext';
 import { logisticsAPI, estimateSnapshotAPI } from '../services/api';
 import DrivingSection from './DrivingSection';
 import FlightsSection from './FlightsSection';
@@ -13,20 +14,20 @@ import './Logistics.css';
 const Logistics = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  
+  const { project, handleProjectNotFound } = useProject();
+
   // Form state
-  const [projectName, setProjectName] = useState('');
   const [siteAccessMode, setSiteAccessMode] = useState('driving');
   const [isLocalProject, setIsLocalProject] = useState(false);
   const [useClientVehicle, setUseClientVehicle] = useState(false);
   const [staffRows, setStaffRows] = useState([{ role: '', count: 0 }]);
   const [perDiemRate, setPerDiemRate] = useState(50); // Default to $50 On-Road
-  
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [estimationResult, setEstimationResult] = useState(null);
   const [laborRates, setLaborRates] = useState([]);
-  
+
   // Section expand/collapse state
   const [expandedSections, setExpandedSections] = useState({
     driving: true,
@@ -34,17 +35,17 @@ const Logistics = () => {
     rental: false,
     lodging: false,
   });
-  
+
   const toggleSection = (section) => {
     setExpandedSections(prev => ({
       ...prev,
       [section]: !prev[section]
     }));
   };
-  
+
   // Rate multiplier state
   const [rateMultiplier, setRateMultiplier] = useState(1.0);
-  
+
   // Roundtrip driving state (for site_access_mode === "driving")
   const [roundtripDrivingData, setRoundtripDrivingData] = useState({
     project_location: '',
@@ -57,7 +58,7 @@ const Logistics = () => {
     cost_per_mile: null,
     anchorage_flat_fee: 45,
   });
-  
+
   // Daily driving state (lodging ⇄ site commute)
   const [dailyDrivingData, setDailyDrivingData] = useState({
     site_location: '',
@@ -69,7 +70,7 @@ const Logistics = () => {
     cost_per_gallon: null,
     cost_per_mile: null,
   });
-  
+
   // Flights state
   const [flightsData, setFlightsData] = useState({
     project_location: '',
@@ -82,7 +83,7 @@ const Logistics = () => {
     layover_cost_per_night: null,
     layover_rooms: null,
   });
-  
+
   // Rental state
   const [rentalData, setRentalData] = useState({
     project_location: '',
@@ -95,7 +96,7 @@ const Logistics = () => {
     rental_days: 0,
     fuel_cost_estimate: null,
   });
-  
+
   // Lodging state
   const [lodgingData, setLodgingData] = useState({
     project_location: '',
@@ -104,7 +105,7 @@ const Logistics = () => {
     project_duration_days: 0,
     num_staff: 0,
   });
-  
+
   // Fetch labor rates on mount
   useEffect(() => {
     const fetchLaborRates = async () => {
@@ -117,22 +118,8 @@ const Logistics = () => {
     };
     fetchLaborRates();
   }, []);
-  
-  // Load project name from localStorage on mount
-  useEffect(() => {
-    const savedProjectName = localStorage.getItem('currentProjectName');
-    if (savedProjectName && !projectName) {
-      setProjectName(savedProjectName);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
-  // Save project name to localStorage when it changes
-  useEffect(() => {
-    if (projectName) {
-      localStorage.setItem('currentProjectName', projectName);
-    }
-  }, [projectName]);
+  // Project context is managed by ProjectProvider - no need for localStorage
 
   // Load snapshot data when project name is available (for form rehydration)
   // IMPORTANT: This runs when component mounts OR when switching back to this route
@@ -144,19 +131,19 @@ const Logistics = () => {
     }
 
     const loadSnapshotData = async () => {
-      if (!projectName) return;
-      
+      if (!project?.name) return;
+
       try {
-        const snapshot = await estimateSnapshotAPI.getLatestSnapshot(projectName);
+        const snapshot = await estimateSnapshotAPI.getLatestSnapshot(project.name);
         if (!snapshot || !snapshot.logistics_data) {
           // No snapshot data available - form stays empty
           return;
         }
-        
+
         const logisticsData = snapshot.logistics_data;
         const inputs = logisticsData.inputs || {};
         const outputs = logisticsData.outputs || {};
-        
+
         // Rehydrate basic settings
         if (inputs.site_access_mode) {
           setSiteAccessMode(inputs.site_access_mode);
@@ -173,12 +160,12 @@ const Logistics = () => {
         if (inputs.rate_multiplier !== undefined) {
           setRateMultiplier(inputs.rate_multiplier);
         }
-        
+
         // Rehydrate staff rows
         if (inputs.staff && Array.isArray(inputs.staff) && inputs.staff.length > 0) {
           setStaffRows(inputs.staff.map(s => ({ role: s.role || '', count: s.count || 0 })));
         }
-        
+
         // Rehydrate driving data
         if (inputs.roundtrip_driving) {
           setRoundtripDrivingData({
@@ -193,7 +180,7 @@ const Logistics = () => {
             anchorage_flat_fee: inputs.roundtrip_driving.anchorage_flat_fee || 45,
           });
         }
-        
+
         if (inputs.daily_driving) {
           setDailyDrivingData({
             site_location: inputs.daily_driving.site_location || '',
@@ -206,7 +193,7 @@ const Logistics = () => {
             cost_per_mile: inputs.daily_driving.cost_per_mile || null,
           });
         }
-        
+
         // Rehydrate flights data
         if (inputs.flights) {
           setFlightsData({
@@ -221,7 +208,7 @@ const Logistics = () => {
             layover_rooms: inputs.flights.layover_rooms || null,
           });
         }
-        
+
         // Rehydrate rental data
         if (inputs.rental) {
           setRentalData({
@@ -236,7 +223,7 @@ const Logistics = () => {
             fuel_cost_estimate: inputs.rental.fuel_cost_estimate || null,
           });
         }
-        
+
         // Rehydrate lodging data
         if (inputs.lodging) {
           setLodgingData({
@@ -247,30 +234,32 @@ const Logistics = () => {
             num_staff: inputs.lodging.num_staff || 0,
           });
         }
-        
+
         // If there are outputs, show the results
         if (outputs.id) {
           setEstimationResult(outputs);
         }
-        
+
       } catch (error) {
         console.error('Error loading snapshot data:', error);
-        // Don't show error to user - just proceed with empty form
+        // Handle 404 - project not found
+        if (error.response?.status === 404) {
+          handleProjectNotFound();
+        }
+        // Don't show other errors to user - just proceed with empty form
       }
     };
-    
+
     loadSnapshotData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectName, location.pathname]);
+  }, [project?.name, location.pathname]);
 
   // Load estimation data from navigation state if available
   useEffect(() => {
     if (location.state?.estimationData) {
       const estimation = location.state.estimationData;
-      
-      if (estimation.project_name) {
-        setProjectName(estimation.project_name);
-      }
+
+      // Project name is managed by context - no need to set it here
       if (estimation.site_access_mode) {
         setSiteAccessMode(estimation.site_access_mode);
       }
@@ -285,7 +274,7 @@ const Logistics = () => {
         const rate = parseFloat(estimation.per_diem_rate);
         setPerDiemRate(rate === 60 ? 60 : 50);
       }
-      
+
       // Load staff rows - prefer staff_breakdown (list), fallback to legacy fields
       if (estimation.staff_breakdown && Array.isArray(estimation.staff_breakdown) && estimation.staff_breakdown.length > 0) {
         // New format: staff_breakdown is a list of { role, count }
@@ -294,7 +283,7 @@ const Logistics = () => {
         // Legacy format: convert to single staff row
         setStaffRows([{ role: estimation.professional_role, count: estimation.num_staff }]);
       }
-      
+
       // Load input snapshots - handle new driving structure
       if (estimation.driving_input) {
         if (estimation.driving_input.roundtrip) {
@@ -309,7 +298,7 @@ const Logistics = () => {
           // Daily section remains empty for legacy records
         }
       }
-      
+
       // Load rate multiplier if present
       if (estimation.rate_multiplier !== undefined && estimation.rate_multiplier !== null) {
         setRateMultiplier(estimation.rate_multiplier);
@@ -323,17 +312,17 @@ const Logistics = () => {
       if (estimation.lodging_input) {
         setLodgingData(estimation.lodging_input);
       }
-      
+
       // If showResults flag is set, display the results immediately
       if (location.state?.showResults) {
         setEstimationResult(estimation);
       }
-      
+
       // Clear navigation state
       window.history.replaceState({}, document.title);
     }
   }, [location.state]);
-  
+
   // Calculate total staff count from staff rows
   const totalStaff = staffRows.reduce((sum, row) => sum + (parseInt(row.count) || 0), 0);
 
@@ -342,7 +331,7 @@ const Logistics = () => {
     setLoading(true);
     setError(null);
     setEstimationResult(null);
-    
+
     // Validation: require at least one staff row with count > 0
     const validStaffRows = staffRows.filter(row => row.role && (parseInt(row.count) || 0) > 0);
     if (validStaffRows.length === 0) {
@@ -350,7 +339,7 @@ const Logistics = () => {
       setLoading(false);
       return;
     }
-    
+
     // Validation for driving mode: require roundtrip driving
     if (siteAccessMode === 'driving') {
       if (!roundtripDrivingData.project_location || !roundtripDrivingData.project_duration_days) {
@@ -362,10 +351,10 @@ const Logistics = () => {
       if (!isAnchorage) {
         // For non-Anchorage: require either cost-per-mile OR (MPG + cost-per-gallon)
         const hasCostPerMile = roundtripDrivingData.cost_per_mile && parseFloat(roundtripDrivingData.cost_per_mile) > 0;
-        const hasMpgAndGallon = roundtripDrivingData.mpg && roundtripDrivingData.cost_per_gallon && 
-                                parseFloat(roundtripDrivingData.mpg) > 0 && parseFloat(roundtripDrivingData.cost_per_gallon) > 0;
+        const hasMpgAndGallon = roundtripDrivingData.mpg && roundtripDrivingData.cost_per_gallon &&
+          parseFloat(roundtripDrivingData.mpg) > 0 && parseFloat(roundtripDrivingData.cost_per_gallon) > 0;
         const hasMiles = roundtripDrivingData.one_way_miles && parseFloat(roundtripDrivingData.one_way_miles) > 0;
-        
+
         if (hasMiles && !hasCostPerMile && !hasMpgAndGallon) {
           setError('For non-Anchorage locations, please provide either cost-per-mile or MPG + cost-per-gallon.');
           setLoading(false);
@@ -373,14 +362,14 @@ const Logistics = () => {
         }
       }
     }
-    
+
     try {
       // Build staff array from valid rows
       const staffArray = validStaffRows.map(row => ({
         role: row.role,
         count: parseInt(row.count) || 0
       }));
-      
+
       // Build roundtrip driving payload (only for driving mode)
       const roundtripDriving = siteAccessMode === 'driving' && roundtripDrivingData.project_location ? {
         project_location: roundtripDrivingData.project_location,
@@ -393,7 +382,7 @@ const Logistics = () => {
         cost_per_mile: roundtripDrivingData.cost_per_mile ? parseFloat(roundtripDrivingData.cost_per_mile) : null,
         anchorage_flat_fee: roundtripDrivingData.anchorage_flat_fee ? parseFloat(roundtripDrivingData.anchorage_flat_fee) : null,
       } : null;
-      
+
       // Build daily driving payload (optional, can apply to both driving and flight modes)
       const dailyDriving = (dailyDrivingData.site_location || dailyDrivingData.lodging_location || dailyDrivingData.daily_miles) ? {
         site_location: dailyDrivingData.site_location || null,
@@ -405,9 +394,9 @@ const Logistics = () => {
         cost_per_gallon: dailyDrivingData.cost_per_gallon ? parseFloat(dailyDrivingData.cost_per_gallon) : null,
         cost_per_mile: dailyDrivingData.cost_per_mile ? parseFloat(dailyDrivingData.cost_per_mile) : null,
       } : null;
-      
+
       const payload = {
-        project_name: projectName || null,
+        project_name: project?.name || null,
         site_access_mode: siteAccessMode,
         is_local_project: isLocalProject,
         use_client_vehicle: useClientVehicle,
@@ -449,9 +438,9 @@ const Logistics = () => {
           num_staff: Number(lodgingData.num_staff) || totalStaff || 0,
         } : null,
       };
-      
+
       console.log("Final Payload:", JSON.stringify(payload, null, 2));
-      
+
       const result = await logisticsAPI.createEstimation(payload);
       setEstimationResult(result);
     } catch (err) {
@@ -461,13 +450,13 @@ const Logistics = () => {
       setLoading(false);
     }
   };
-  
+
   // Determine which sections should be visible
   const showDriving = siteAccessMode === 'driving' || (siteAccessMode === 'flight' && !isLocalProject);
   const showFlights = siteAccessMode === 'flight' && !isLocalProject;
   const showRental = siteAccessMode === 'flight' && !isLocalProject && !useClientVehicle;
   const showLodging = !isLocalProject;
-  
+
   return (
     <div className="logistics-container">
       <nav className="logistics-nav">
@@ -477,7 +466,7 @@ const Logistics = () => {
         <div className="nav-title">
           <h1>Logistics Estimator</h1>
         </div>
-        <button 
+        <button
           className="view-estimations-btn"
           onClick={() => navigate('/previous-estimates')}
         >
@@ -485,32 +474,15 @@ const Logistics = () => {
         </button>
       </nav>
 
-      <header className="logistics-header">
+      {/* <header className="logistics-header">
         <p>Calculate travel and accommodation costs for your project</p>
-      </header>
+      </header> */}
 
       {/* Project Header with Navigation */}
-      <ProjectHeader projectName={projectName} moduleName="logistics" />
+      <ProjectHeader projectName={project?.name} moduleName="logistics" />
 
       <div className="logistics-content">
         <form onSubmit={handleSubmit} className="logistics-form">
-          {/* Project Name */}
-          <div className="form-section">
-            <div className="form-group">
-              <label htmlFor="project-name">Project Name</label>
-              <input
-                id="project-name"
-                type="text"
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-                placeholder="Enter project name (e.g., 'One Sample')"
-                className="form-input"
-              />
-              <small style={{ fontSize: '0.85rem', color: '#666', marginTop: '4px', display: 'block' }}>
-                This project name will be shared across all modules
-              </small>
-            </div>
-          </div>
 
           {/* Site Access Mode - Radio Buttons */}
           <div className="form-section">
@@ -649,7 +621,7 @@ const Logistics = () => {
               onToggle={() => toggleSection('driving')}
             />
           )}
-          
+
 
           {/* Flights Section */}
           {showFlights && (
@@ -684,8 +656,8 @@ const Logistics = () => {
 
           {/* Submit Button */}
           <div className="form-actions">
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="submit-btn"
               disabled={loading}
             >

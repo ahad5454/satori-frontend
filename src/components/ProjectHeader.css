@@ -1,162 +1,160 @@
 .project-header {
-  margin-bottom: 30px;
+  margin-bottom: 24px;
   background: white;
-  border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color);
   overflow: hidden;
+  margin-top: -24px;
+  /* Pull up to sit under main nav if needed, or just standard spacing */
 }
 
 .project-name-banner {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 18px 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  gap: 16px;
+  padding: 16px 24px;
+  background: #e7eef5;
+
+  border-bottom: 1px solid var(--border-color);
 }
 
 .project-actions {
   display: flex;
   gap: 12px;
   padding: 12px 24px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e0e0e0;
+  background: #e7eef5;
+  border-bottom: none;
 }
 
 .btn-save-close,
 .btn-discard {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 8px;
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
   font-weight: 600;
   font-size: 0.9rem;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
 }
 
 .btn-save-close {
-  background: #27ae60;
+  background: var(--success-color);
   color: white;
 }
 
 .btn-save-close:hover:not(:disabled) {
-  background: #229954;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(39, 174, 96, 0.3);
+  background: #219150;
+  box-shadow: var(--shadow-sm);
+  transform: none;
 }
 
 .btn-discard {
-  background: #e74c3c;
-  color: white;
+  background: white;
+  color: var(--danger-color);
+  border-color: var(--border-color);
 }
 
 .btn-discard:hover:not(:disabled) {
-  background: #c0392b;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(231, 76, 60, 0.3);
+  background: #fff5f5;
+  border-color: var(--danger-color);
+  transform: none;
+  box-shadow: none;
 }
 
 .btn-save-close:disabled,
 .btn-discard:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-  transform: none;
 }
 
 .project-label {
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
-  font-size: 0.9rem;
-  letter-spacing: 0.3px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .project-name-value {
   font-weight: 700;
-  color: #fff;
-  font-size: 1.2rem;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
-  letter-spacing: 0.2px;
+  color: var(--text-primary);
+  font-size: 1.25rem;
+  text-shadow: none;
+  letter-spacing: 0;
 }
 
 .module-navigation {
   display: flex;
-  background: #ffffff;
-  padding: 8px;
-  gap: 8px;
+  background: #e7eef5;
+  padding: 0;
+  gap: 0;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .nav-module-btn {
   flex: 1;
-  padding: 14px 20px;
-  background: #f8f9fa;
-  border: 2px solid transparent;
-  border-radius: 10px;
-  color: #495057;
+  padding: 16px 20px;
+  background: #e7eef5;
+  border: none;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  color: var(--text-secondary);
   font-weight: 600;
   font-size: 0.95rem;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s ease;
   position: relative;
   text-align: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  box-shadow: none;
 }
 
 .nav-module-btn:hover {
-  background: #e9ecef;
-  color: #667eea;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
-  border-color: rgba(102, 126, 234, 0.2);
+  background: #dfe6ed;
+  color: var(--primary-color);
+  transform: none;
+  box-shadow: none;
+  border-color: var(--border-color);
 }
 
 .nav-module-btn.active {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #ffffff;
-  border-color: transparent;
+  background: white;
+  color: var(--accent-color);
+  border-color: var(--accent-color);
   font-weight: 700;
-  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
-  transform: translateY(-2px);
+  box-shadow: none;
+  transform: none;
 }
 
 .nav-module-btn.active:hover {
-  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  background: white;
 }
 
 .nav-module-btn:active {
-  transform: translateY(0);
-  transition: transform 0.1s ease;
+  transform: none;
 }
 
-/* Add a subtle glow effect for active tab */
+/* Remove glow effect */
 .nav-module-btn.active::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  border-radius: 10px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, transparent 100%);
-  pointer-events: none;
+  display: none;
 }
 
 @media (max-width: 768px) {
   .module-navigation {
     flex-direction: column;
-    gap: 6px;
+    gap: 0;
   }
-  
+
   .nav-module-btn {
     width: 100%;
-    padding: 16px 20px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border-color);
+    border-left: 4px solid transparent;
+    text-align: left;
   }
-  
+
   .nav-module-btn.active {
-    transform: none;
-  }
-  
-  .nav-module-btn:hover {
-    transform: none;
+    border-bottom: 1px solid var(--border-color);
+    border-left-color: var(--accent-color);
   }
 }
-

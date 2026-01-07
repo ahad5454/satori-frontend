@@ -1,51 +1,103 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useProject } from '../contexts/ProjectContext';
 import './Home.css';
 
 const Home = () => {
+  const navigate = useNavigate();
+  const { clearProject } = useProject();
+
+  // Clear project context when Home page loads (project-agnostic)
+  useEffect(() => {
+    clearProject();
+  }, [clearProject]);
+
+  const handleModuleClick = (modulePath) => {
+    // Always redirect to project selection with intended destination
+    navigate('/select-project', { state: { from: modulePath } });
+  };
+
   return (
     <div className="home-container">
       <div className="home-hero">
         <div className="hero-content">
           <h1>Satori Group ERP</h1>
           <p className="hero-subtitle">
-            Comprehensive environmental services & solutions since 2001. 
-            SBA-certified woman-owned small business delivering expert environmental consulting, 
-            hazardous materials remediation, and safety training.
+            Internal Enterprise Resource Planning System
           </p>
-          <div className="hero-features">
-            <div className="feature-card">
-              <div className="feature-icon">🏆</div>
-              <h3>20+ Years Experience</h3>
-              <p>Two decades of industry expertise and proven track record</p>
+
+          {/* Dashboard Actions - Replaces Marketing Features */}
+          <div className="hero-actions dashboard-grid">
+            {/* Main Action - Full Width or Prominent */}
+            <div className="action-group primary">
+              <button
+                onClick={() => navigate('/select-project', { state: { mode: 'create' } })}
+                className="cta-button primary-large"
+              >
+                <div className="icon-container-primary">
+                  <span className="material-icon">+</span>
+                </div>
+                <div className="btn-content">
+                  <span className="btn-title">Create New Project</span>
+                  <span className="btn-desc">Start a new estimation or lab order</span>
+                </div>
+              </button>
             </div>
-            <div className="feature-card">
-              <div className="feature-icon">🌍</div>
-              <h3>National & International</h3>
-              <p>From remote Alaskan villages to metropolitan areas</p>
+
+            {/* Modules Grid - Left Aligned, Professional Cards */}
+            <div className="action-group modules">
+              <button
+                onClick={() => handleModuleClick('/hrs-estimator')}
+                className="module-card"
+              >
+                <div className="module-icon-container hrs-theme">
+                  <span className="module-initial">H</span>
+                </div>
+                <div className="module-content">
+                  <h3>HRS Estimator</h3>
+                  <p>Sample quantities & hours</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleModuleClick('/lab-fees')}
+                className="module-card"
+              >
+                <div className="module-icon-container lab-theme">
+                  <span className="module-initial">L</span>
+                </div>
+                <div className="module-content">
+                  <h3>Lab Fees</h3>
+                  <p>Calculate lab costs</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleModuleClick('/logistics')}
+                className="module-card"
+              >
+                <div className="module-icon-container logistics-theme">
+                  <span className="module-initial">T</span>
+                </div>
+                <div className="module-content">
+                  <h3>Logistics</h3>
+                  <p>Field logistics estimator</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => navigate('/previous-estimates')}
+                className="module-card history-theme"
+              >
+                <div className="module-icon-container history-icon">
+                  <span className="module-initial">↩</span>
+                </div>
+                <div className="module-content">
+                  <h3>Previous Estimates</h3>
+                  <p>View project history</p>
+                </div>
+              </button>
             </div>
-            <div className="feature-card">
-              <div className="feature-icon">✅</div>
-              <h3>Certified Professionals</h3>
-              <p>Committed to safety and regulatory compliance</p>
-            </div>
-          </div>
-          <div className="hero-actions">
-            <Link to="/hrs-estimator" className="cta-button primary">
-              HRS Sample Estimator
-            </Link>
-            <Link to="/lab-fees" className="cta-button secondary">
-              Lab Fee Calculator
-            </Link>
-            <Link to="/logistics" className="cta-button secondary">
-              Logistics Estimator
-            </Link>
-            <Link to="/project-summary" className="cta-button secondary">
-              Project Estimate Summary
-            </Link>
-            <Link to="/previous-estimates" className="cta-button secondary">
-              Previous Estimates
-            </Link>
           </div>
         </div>
       </div>
@@ -56,18 +108,18 @@ const Home = () => {
           <div className="services-grid">
             <div className="service-card">
               <h3>🔬 Environmental Consulting & Assessment</h3>
-              <p>Hazardous building materials surveys, Phase I & II environmental site assessments, 
-                 industrial hygiene services, groundwater investigations, soil remediation, and AHERA school inspections</p>
+              <p>Hazardous building materials surveys, Phase I & II environmental site assessments,
+                industrial hygiene services, groundwater investigations, soil remediation, and AHERA school inspections</p>
             </div>
             <div className="service-card">
               <h3>🛡️ Professional Abatement Services</h3>
-              <p>Asbestos removal and management, lead-based paint remediation, mold detection and removal, 
-                 with full-service project management from inspection to clearance</p>
+              <p>Asbestos removal and management, lead-based paint remediation, mold detection and removal,
+                with full-service project management from inspection to clearance</p>
             </div>
             <div className="service-card">
               <h3>🏗️ Specialized Demolition</h3>
-              <p>Total building demolition, selective interior dismantling, tank and silo removal, 
-                 emergency response services, and commercial tenant improvements</p>
+              <p>Total building demolition, selective interior dismantling, tank and silo removal,
+                emergency response services, and commercial tenant improvements</p>
             </div>
             <div className="service-card">
               <h3>📚 Training & Certification</h3>
@@ -75,13 +127,13 @@ const Home = () => {
             </div>
             <div className="service-card">
               <h3>🧪 Laboratory Services</h3>
-              <p>Comprehensive laboratory testing including PCM/TEM air analysis, PLM bulk materials analysis, 
-                 lead testing, mold analysis, and environmental chemistry services</p>
+              <p>Comprehensive laboratory testing including PCM/TEM air analysis, PLM bulk materials analysis,
+                lead testing, mold analysis, and environmental chemistry services</p>
             </div>
             <div className="service-card">
               <h3>📊 Project Management</h3>
-              <p>Full-service project management with responsive communication and reliable execution 
-                 from initial assessment through final clearance</p>
+              <p>Full-service project management with responsive communication and reliable execution
+                from initial assessment through final clearance</p>
             </div>
           </div>
         </div>
@@ -124,19 +176,40 @@ const Home = () => {
           <h3>Ready to Get Started?</h3>
           <p>Access our ERP tools to manage lab fees and estimate field hours for your environmental projects</p>
           <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link to="/hrs-estimator" className="cta-button primary">
+            <button
+              onClick={() => navigate('/select-project', { state: { mode: 'create' } })}
+              className="cta-button primary"
+            >
+              Create New Project
+            </button>
+            <button
+              onClick={() => handleModuleClick('/hrs-estimator')}
+              className="cta-button primary"
+            >
               HRS Sample Estimator
-            </Link>
-            <Link to="/lab-fees" className="cta-button primary">
+            </button>
+            <button
+              onClick={() => handleModuleClick('/lab-fees')}
+              className="cta-button primary"
+            >
               Lab Fee Calculator
-            </Link>
-            <Link to="/logistics" className="cta-button primary">
+            </button>
+            <button
+              onClick={() => handleModuleClick('/logistics')}
+              className="cta-button primary"
+            >
               Logistics Estimator
-            </Link>
+            </button>
+            <button
+              onClick={() => navigate('/previous-estimates')}
+              className="cta-button primary"
+            >
+              View Previous Estimates
+            </button>
           </div>
           <div className="footer-info">
             <p className="footer-company">
-              <strong>Satori Group, Inc.</strong> - Women-Owned Small Business<br/>
+              <strong>Satori Group, Inc.</strong> - Women-Owned Small Business<br />
               Specializing in environmental services, hazardous materials surveys, remediation, and health and safety training
             </p>
           </div>

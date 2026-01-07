@@ -321,6 +321,75 @@ export const logisticsAPI = {
   },
 };
 
+export const projectAPI = {
+  // List all projects
+  listProjects: async (status = null) => {
+    try {
+      const url = status ? `/projects/?status=${status}` : '/projects/';
+      const response = await api.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('Error listing projects:', error);
+      throw error;
+    }
+  },
+
+  // Get project by ID
+  getProject: async (projectId) => {
+    try {
+      const response = await api.get(`/projects/${projectId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching project:', error);
+      throw error;
+    }
+  },
+
+  // Get project by name
+  getProjectByName: async (projectName) => {
+    try {
+      const response = await api.get(`/projects/by-name/${encodeURIComponent(projectName)}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching project by name:', error);
+      throw error;
+    }
+  },
+
+  // Create new project
+  createProject: async (projectData) => {
+    try {
+      const response = await api.post('/projects/', projectData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating project:', error);
+      throw error;
+    }
+  },
+
+  // Update project
+  updateProject: async (projectId, projectData) => {
+    try {
+      const response = await api.put(`/projects/${projectId}`, projectData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating project:', error);
+      throw error;
+    }
+  },
+
+  // Delete project (deletes project and all associated data)
+  deleteProject: async (projectId) => {
+    try {
+      const response = await api.delete(`/projects/${projectId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      throw error;
+    }
+  },
+};
+
 export const projectSummaryAPI = {
   // Get project estimate summary
   getEstimateSummary: async (projectName) => {

@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useProject } from '../contexts/ProjectContext';
 import { hrsEstimatorAPI, estimateSnapshotAPI } from '../services/api';
 import StaffRows from './StaffRows';
 import ProjectHeader from './ProjectHeader';
+import HRSBreakdownDetails from './HRSBreakdownDetails';
 import './HRSEstimator.css';
 
 const HRSEstimator = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  
+  const { project, handleProjectNotFound } = useProject();
+
   // Form state
-  const [projectName, setProjectName] = useState('');
   const [fieldStaffCount, setFieldStaffCount] = useState(1);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -18,10 +20,10 @@ const HRSEstimator = () => {
   const [estimationResult, setEstimationResult] = useState(null);
   const [laborRates, setLaborRates] = useState([]);
   const [showBreakdown, setShowBreakdown] = useState(false);
-  
+
   // Staff rows (multiple roles support)
   const [staffRows, setStaffRows] = useState([{ role: '', count: 0 }]);
-  
+
   // Legacy: single role selection (for backward compatibility)
   const [selectedRole, setSelectedRole] = useState('');
   const [manualLaborHours, setManualLaborHours] = useState({
@@ -30,7 +32,7 @@ const HRSEstimator = () => {
     'Accounting': '',
     'Administrative': '',
   });
-  
+
   // Section expand/collapse state
   const [expandedSections, setExpandedSections] = useState({
     asbestos: true,
@@ -39,7 +41,7 @@ const HRSEstimator = () => {
     orm: false,
     laborCategories: false,
   });
-  
+
   const toggleSection = (section) => {
     setExpandedSections(prev => ({
       ...prev,
@@ -60,31 +62,7 @@ const HRSEstimator = () => {
     fetchLaborRates();
   }, []);
 
-  // Load project name from localStorage or navigation state on mount
-  useEffect(() => {
-    // Check navigation state first (from Lab Fees "Add Labor" button)
-    if (location.state?.projectName) {
-      setProjectName(location.state.projectName);
-      localStorage.setItem('currentProjectName', location.state.projectName);
-    } else {
-      // Otherwise load from localStorage
-      const savedProjectName = localStorage.getItem('currentProjectName');
-      if (savedProjectName) {
-        setProjectName(savedProjectName);
-      }
-    }
-    // Clear navigation state
-    if (location.state?.projectName) {
-      window.history.replaceState({}, document.title);
-    }
-  }, [location.state]);
-
-  // Save project name to localStorage when it changes
-  useEffect(() => {
-    if (projectName) {
-      localStorage.setItem('currentProjectName', projectName);
-    }
-  }, [projectName]);
+  // Project context is managed by ProjectProvider - no need for localStorage
 
   // Load snapshot data when project name is available (for form rehydration)
   // IMPORTANT: This runs when component mounts OR when switching back to this route
@@ -96,24 +74,24 @@ const HRSEstimator = () => {
     }
 
     const loadSnapshotData = async () => {
-      if (!projectName) return;
-      
+      if (!project?.name) return;
+
       try {
-        const snapshot = await estimateSnapshotAPI.getLatestSnapshot(projectName);
+        const snapshot = await estimateSnapshotAPI.getLatestSnapshot(project.name);
         if (!snapshot || !snapshot.hrs_estimator_data) {
           // No snapshot data available - form stays empty
           return;
         }
-        
+
         const hrsData = snapshot.hrs_estimator_data;
         const inputs = hrsData.inputs || {};
         const outputs = hrsData.outputs || {};
-        
+
         // Rehydrate form fields from saved inputs
         if (inputs.field_staff_count) {
           setFieldStaffCount(inputs.field_staff_count);
         }
-        
+
         // Override minutes
         if (inputs.override_minutes_asbestos !== undefined && inputs.override_minutes_asbestos !== null) {
           setOverrideMinutes(prev => ({ ...prev, asbestos: inputs.override_minutes_asbestos }));
@@ -127,7 +105,7 @@ const HRSEstimator = () => {
         if (inputs.override_minutes_mold !== undefined && inputs.override_minutes_mold !== null) {
           setOverrideMinutes(prev => ({ ...prev, mold: inputs.override_minutes_mold }));
         }
-        
+
         // Asbestos lines
         if (inputs.asbestos_lines && Array.isArray(inputs.asbestos_lines)) {
           const newAsbestosData = { ...asbestosData };
@@ -142,7 +120,7 @@ const HRSEstimator = () => {
           });
           setAsbestosData(newAsbestosData);
         }
-        
+
         // Lead lines
         if (inputs.lead_lines && Array.isArray(inputs.lead_lines)) {
           const newLeadData = { ...leadData };
@@ -156,7 +134,7 @@ const HRSEstimator = () => {
           });
           setLeadData(newLeadData);
         }
-        
+
         // Mold lines
         if (inputs.mold_lines && Array.isArray(inputs.mold_lines)) {
           const newMoldData = { ...moldData };
@@ -171,7 +149,7 @@ const HRSEstimator = () => {
           });
           setMoldData(newMoldData);
         }
-        
+
         // ORM
         if (inputs.orm) {
           setOrmData({
@@ -179,14 +157,14 @@ const HRSEstimator = () => {
             hours: inputs.orm.hours?.toString() || ''
           });
         }
-        
+
         // Staff selection
         if (inputs.staff && Array.isArray(inputs.staff) && inputs.staff.length > 0) {
           setStaffRows(inputs.staff.map(s => ({ role: s.role || '', count: s.count || 0 })));
         } else if (inputs.selected_role) {
           setSelectedRole(inputs.selected_role);
         }
-        
+
         // Manual labor hours
         if (inputs.manual_labor_hours) {
           const loadedManualHours = {
@@ -197,22 +175,26 @@ const HRSEstimator = () => {
           };
           setManualLaborHours(loadedManualHours);
         }
-        
+
         // If there are outputs, show the results
         if (outputs.id) {
           setEstimationResult(outputs);
           setShowBreakdown(true);
         }
-        
+
       } catch (error) {
         console.error('Error loading snapshot data:', error);
-        // Don't show error to user - just proceed with empty form
+        // Handle 404 - project not found
+        if (error.response?.status === 404) {
+          handleProjectNotFound();
+        }
+        // Don't show other errors to user - just proceed with empty form
       }
     };
-    
+
     loadSnapshotData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectName, location.pathname]);
+  }, [project?.name, location.pathname]);
 
   // Calculate total staff count from staff rows
   const totalStaff = staffRows.reduce((sum, row) => sum + (parseInt(row.count) || 0), 0);
@@ -220,7 +202,7 @@ const HRSEstimator = () => {
   // Initialize staff rows when field staff count changes
   useEffect(() => {
     const fieldCount = parseInt(fieldStaffCount) || 1;
-    
+
     // If field staff count changes and we have no rows or all rows are empty, create initial rows
     if (staffRows.length === 0 || (staffRows.length === 1 && !staffRows[0].role && staffRows[0].count === 0)) {
       const newRows = [];
@@ -231,7 +213,7 @@ const HRSEstimator = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fieldStaffCount]);
-  
+
   // Advanced settings (override_minutes fields)
   const [overrideMinutes, setOverrideMinutes] = useState({
     asbestos: null,
@@ -279,7 +261,7 @@ const HRSEstimator = () => {
   const calculateAsbestosTotals = () => {
     let totalPLM = 0;
     const bulkSummaries = {};
-    
+
     Object.entries(asbestosData).forEach(([component, data]) => {
       const actuals = parseInt(data.actuals) || 0;
       const bulksPerUnit = parseInt(data.bulks_per_unit) || 0;
@@ -287,7 +269,7 @@ const HRSEstimator = () => {
       bulkSummaries[component] = bulkSummary;
       totalPLM += bulkSummary;
     });
-    
+
     return { bulkSummaries, totalPLM };
   };
 
@@ -295,12 +277,12 @@ const HRSEstimator = () => {
   const calculateLeadTotals = () => {
     let totalXRF = 0;
     let totalChipsWipes = 0;
-    
+
     Object.values(leadData).forEach(data => {
       totalXRF += parseInt(data.xrf_shots) || 0;
       totalChipsWipes += parseInt(data.chips_wipes) || 0;
     });
-    
+
     return { totalXRF, totalChipsWipes };
   };
 
@@ -309,13 +291,13 @@ const HRSEstimator = () => {
     let totalTapeLift = 0;
     let totalSporeTrap = 0;
     let totalCulturable = 0;
-    
+
     Object.values(moldData).forEach(data => {
       totalTapeLift += parseInt(data.tape_lift) || 0;
       totalSporeTrap += parseInt(data.spore_trap) || 0;
       totalCulturable += parseInt(data.culturable) || 0;
     });
-    
+
     return { totalTapeLift, totalSporeTrap, totalCulturable };
   };
 
@@ -351,17 +333,17 @@ const HRSEstimator = () => {
 
       // Build request payload
       const payload = {
-        project_name: projectName || null,
+        project_name: project?.name || null,
         field_staff_count: Number(fieldStaffCount) || 1,
         asbestos_lines: asbestosLines,
         lead_lines: leadLines,
         mold_lines: moldLines,
         orm: (ormData.building_total_sf || ormData.hours)
-        ? {
+          ? {
             building_total_sf: Number(ormData.building_total_sf) || 0,
             hours: Number(ormData.hours) || 0,
           }
-        : null,
+          : null,
       };
 
       // Add override_minutes if set
@@ -389,7 +371,7 @@ const HRSEstimator = () => {
         // Legacy: single role support
         payload.selected_role = selectedRole;
       }
-      
+
       // Build manual_labor_hours object (only include non-empty values)
       const manualHoursObj = {};
       Object.entries(manualLaborHours).forEach(([role, hours]) => {
@@ -398,7 +380,7 @@ const HRSEstimator = () => {
           manualHoursObj[role] = hoursValue;
         }
       });
-      
+
       if (Object.keys(manualHoursObj).length > 0) {
         payload.manual_labor_hours = manualHoursObj;
       }
@@ -407,7 +389,7 @@ const HRSEstimator = () => {
 
       const result = await hrsEstimatorAPI.createEstimation(payload);
       setEstimationResult(result);
-      
+
       // Dispatch custom event to notify other components (e.g., LabTests) to refresh
       window.dispatchEvent(new CustomEvent('hrs-estimation-complete', {
         detail: { estimationId: result.id }
@@ -424,17 +406,14 @@ const HRSEstimator = () => {
   useEffect(() => {
     if (location.state?.estimationData) {
       const estimation = location.state.estimationData;
-      
-      // Set project name
-      if (estimation.project_name) {
-        setProjectName(estimation.project_name);
-      }
-      
+
+      // Project name is managed by context - no need to set it here
+
       // Set field staff count
       if (estimation.field_staff_count) {
         setFieldStaffCount(estimation.field_staff_count);
       }
-      
+
       // Load asbestos data
       if (estimation.asbestos_lines) {
         const newAsbestosData = {
@@ -456,7 +435,7 @@ const HRSEstimator = () => {
         });
         setAsbestosData(newAsbestosData);
       }
-      
+
       // Load lead data
       if (estimation.lead_lines) {
         const newLeadData = {
@@ -476,7 +455,7 @@ const HRSEstimator = () => {
         });
         setLeadData(newLeadData);
       }
-      
+
       // Load mold data
       if (estimation.mold_lines) {
         const newMoldData = {
@@ -498,7 +477,7 @@ const HRSEstimator = () => {
         });
         setMoldData(newMoldData);
       }
-      
+
       // Load ORM data
       if (estimation.orm) {
         setOrmData({
@@ -506,7 +485,7 @@ const HRSEstimator = () => {
           hours: estimation.orm.hours?.toString() || '',
         });
       }
-      
+
       // Load override minutes if they exist
       if (estimation.override_minutes_asbestos !== undefined) {
         setOverrideMinutes(prev => ({
@@ -536,7 +515,7 @@ const HRSEstimator = () => {
         }));
         setShowAdvanced(true);
       }
-      
+
       // Load staff breakdown (preferred) or legacy selected_role
       if (estimation.staff_breakdown && Array.isArray(estimation.staff_breakdown) && estimation.staff_breakdown.length > 0) {
         setStaffRows(estimation.staff_breakdown.map(s => ({ role: s.role || '', count: s.count || 0 })));
@@ -544,7 +523,7 @@ const HRSEstimator = () => {
         // Legacy: single role
         setSelectedRole(estimation.selected_role);
       }
-      
+
       if (estimation.manual_labor_hours) {
         const loadedManualHours = {
           'Program Manager': estimation.manual_labor_hours['Program Manager']?.toString() || '',
@@ -558,7 +537,7 @@ const HRSEstimator = () => {
           setExpandedSections(prev => ({ ...prev, laborCategories: true }));
         }
       }
-      
+
       // Clear navigation state to prevent reloading on re-render
       window.history.replaceState({}, document.title);
     }
@@ -578,7 +557,7 @@ const HRSEstimator = () => {
         <div className="nav-title">
           <h1>HRS Sample Estimator</h1>
         </div>
-        <button 
+        <button
           className="view-estimations-btn"
           onClick={() => navigate('/previous-estimates')}
         >
@@ -586,36 +565,18 @@ const HRSEstimator = () => {
         </button>
       </nav>
 
-      <header className="hrs-estimator-header">
+      {/* <header className="hrs-estimator-header">
         <p>Calculate the hours needed for field sampling work</p>
-      </header>
+      </header> */}
 
       {/* Project Header with Navigation */}
-      <ProjectHeader projectName={projectName} moduleName="hrs" />
+      <ProjectHeader projectName={project?.name} moduleName="hrs" />
 
       <div className="hrs-estimator-content">
         <form onSubmit={handleSubmit} className="estimator-form">
-          {/* Project Name */}
-          <div className="form-section">
-            <div className="form-group">
-              <label htmlFor="project-name">Project Name</label>
-              <input
-                id="project-name"
-                type="text"
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-                placeholder="Enter project name (e.g., 'One Sample')"
-                className="form-input"
-              />
-              <small style={{ fontSize: '0.85rem', color: '#666', marginTop: '4px', display: 'block' }}>
-                Use the same project name across all tools to keep everything organized
-              </small>
-            </div>
-          </div>
-
           {/* Asbestos Sampling Section */}
           <div className="collapsible-section">
-            <div 
+            <div
               className="section-header clickable"
               onClick={() => toggleSection('asbestos')}
             >
@@ -623,77 +584,76 @@ const HRSEstimator = () => {
               <span className="toggle-icon">{expandedSections.asbestos ? '▼' : '▶'}</span>
             </div>
             {expandedSections.asbestos && (
-            <div className="section-content">
-              <div className="input-grid">
-                {Object.entries(asbestosData).map(([component, data]) => {
-                  const isRooms = data.unit_label === 'Rooms';
-                  return (
-                    <div key={component} className="input-row">
-                      <div className="component-name">{component}</div>
-                      <div className="input-group">
-                        <label>Number of {data.unit_label}</label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={data.actuals}
-                          onChange={(e) => {
-                            let value = e.target.value;
-                            // Only allow whole numbers
-                            if (value !== '' && !isNaN(value)) {
-                              value = Math.floor(Math.max(0, parseInt(value) || 0)).toString();
-                            }
-                            setAsbestosData({
-                              ...asbestosData,
-                              [component]: { ...data, actuals: value }
-                            });
-                          }}
-                          className="form-input small"
-                          placeholder="0"
-                        />
-                      </div>
-                      <div className="input-group">
-                        <label>Bulk Samples per {data.unit_label === 'Rooms' ? 'Room' : data.unit_label === 'LF' ? 'Linear Foot' : 'Each'}</label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={data.bulks_per_unit}
-                          onChange={(e) => {
-                            let value = e.target.value;
-                            // Only allow whole numbers
-                            if (value !== '' && !isNaN(value)) {
-                              value = Math.floor(Math.max(0, parseInt(value) || 0)).toString();
-                            }
-                            setAsbestosData({
-                              ...asbestosData,
-                              [component]: { ...data, bulks_per_unit: value }
-                            });
-                          }}
-                          className="form-input small"
-                          placeholder="0"
-                        />
-                      </div>
-                      <div className="calculated-value">
-                        <label>Total Bulk Samples</label>
-                        <div className="value-display">
-                          {Math.round(asbestosTotals.bulkSummaries[component])}
+              <div className="section-content">
+                <div className="input-grid">
+                  {Object.entries(asbestosData).map(([component, data]) => {
+                    return (
+                      <div key={component} className="input-row">
+                        <div className="component-name">{component}</div>
+                        <div className="input-group">
+                          <label>Number of {data.unit_label}</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={data.actuals}
+                            onChange={(e) => {
+                              let value = e.target.value;
+                              // Only allow whole numbers
+                              if (value !== '' && !isNaN(value)) {
+                                value = Math.floor(Math.max(0, parseInt(value) || 0)).toString();
+                              }
+                              setAsbestosData({
+                                ...asbestosData,
+                                [component]: { ...data, actuals: value }
+                              });
+                            }}
+                            className="form-input small"
+                            placeholder="0"
+                          />
+                        </div>
+                        <div className="input-group">
+                          <label>Bulk Samples per {data.unit_label === 'Rooms' ? 'Room' : data.unit_label === 'LF' ? 'Linear Foot' : 'Each'}</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={data.bulks_per_unit}
+                            onChange={(e) => {
+                              let value = e.target.value;
+                              // Only allow whole numbers
+                              if (value !== '' && !isNaN(value)) {
+                                value = Math.floor(Math.max(0, parseInt(value) || 0)).toString();
+                              }
+                              setAsbestosData({
+                                ...asbestosData,
+                                [component]: { ...data, bulks_per_unit: value }
+                              });
+                            }}
+                            className="form-input small"
+                            placeholder="0"
+                          />
+                        </div>
+                        <div className="calculated-value">
+                          <label>Total Bulk Samples</label>
+                          <div className="value-display">
+                            {Math.round(asbestosTotals.bulkSummaries[component])}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
+                <div className="section-total">
+                  <strong>Total PLM: {Math.round(asbestosTotals.totalPLM)}</strong>
+                </div>
               </div>
-              <div className="section-total">
-                <strong>Total PLM: {Math.round(asbestosTotals.totalPLM)}</strong>
-              </div>
-            </div>
             )}
           </div>
 
           {/* Lead Sampling Section */}
           <div className="collapsible-section">
-            <div 
+            <div
               className="section-header clickable"
               onClick={() => toggleSection('lead')}
             >
@@ -701,69 +661,69 @@ const HRSEstimator = () => {
               <span className="toggle-icon">{expandedSections.lead ? '▼' : '▶'}</span>
             </div>
             {expandedSections.lead && (
-            <div className="section-content">
-              <div className="input-grid">
-                {Object.entries(leadData).map(([component, data]) => (
-                  <div key={component} className="input-row">
-                    <div className="component-name">{component}</div>
-                    <div className="input-group">
-                      <label>Number of XRF Shots</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={data.xrf_shots}
-                        onChange={(e) => {
-                          let value = e.target.value;
-                          // Only allow whole numbers
-                          if (value !== '' && !isNaN(value)) {
-                            value = Math.floor(Math.max(0, parseFloat(value) || 0)).toString();
-                          }
-                          setLeadData({
-                            ...leadData,
-                            [component]: { ...data, xrf_shots: value }
-                          });
-                        }}
-                        className="form-input small"
-                        placeholder="0"
-                      />
+              <div className="section-content">
+                <div className="input-grid">
+                  {Object.entries(leadData).map(([component, data]) => (
+                    <div key={component} className="input-row">
+                      <div className="component-name">{component}</div>
+                      <div className="input-group">
+                        <label>Number of XRF Shots</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={data.xrf_shots}
+                          onChange={(e) => {
+                            let value = e.target.value;
+                            // Only allow whole numbers
+                            if (value !== '' && !isNaN(value)) {
+                              value = Math.floor(Math.max(0, parseFloat(value) || 0)).toString();
+                            }
+                            setLeadData({
+                              ...leadData,
+                              [component]: { ...data, xrf_shots: value }
+                            });
+                          }}
+                          className="form-input small"
+                          placeholder="0"
+                        />
+                      </div>
+                      <div className="input-group">
+                        <label>Number of Chips/Wipes</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={data.chips_wipes}
+                          onChange={(e) => {
+                            let value = e.target.value;
+                            // Only allow whole numbers
+                            if (value !== '' && !isNaN(value)) {
+                              value = Math.floor(Math.max(0, parseFloat(value) || 0)).toString();
+                            }
+                            setLeadData({
+                              ...leadData,
+                              [component]: { ...data, chips_wipes: value }
+                            });
+                          }}
+                          className="form-input small"
+                          placeholder="0"
+                        />
+                      </div>
                     </div>
-                    <div className="input-group">
-                      <label>Number of Chips/Wipes</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={data.chips_wipes}
-                        onChange={(e) => {
-                          let value = e.target.value;
-                          // Only allow whole numbers
-                          if (value !== '' && !isNaN(value)) {
-                            value = Math.floor(Math.max(0, parseFloat(value) || 0)).toString();
-                          }
-                          setLeadData({
-                            ...leadData,
-                            [component]: { ...data, chips_wipes: value }
-                          });
-                        }}
-                        className="form-input small"
-                        placeholder="0"
-                      />
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                <div className="section-total">
+                  <strong>Total XRF Shots: {Math.round(leadTotals.totalXRF)}</strong>
+                  <strong>Total Chips/Wipes: {Math.round(leadTotals.totalChipsWipes)}</strong>
+                </div>
               </div>
-              <div className="section-total">
-                <strong>Total XRF Shots: {Math.round(leadTotals.totalXRF)}</strong>
-                <strong>Total Chips/Wipes: {Math.round(leadTotals.totalChipsWipes)}</strong>
-              </div>
-            </div>
             )}
           </div>
 
           {/* Mold Sampling Section */}
           <div className="collapsible-section">
-            <div 
+            <div
               className="section-header clickable"
               onClick={() => toggleSection('mold')}
             >
@@ -771,92 +731,92 @@ const HRSEstimator = () => {
               <span className="toggle-icon">{expandedSections.mold ? '▼' : '▶'}</span>
             </div>
             {expandedSections.mold && (
-            <div className="section-content">
-              <div className="input-grid">
-                {Object.entries(moldData).map(([component, data]) => (
-                  <div key={component} className="input-row">
-                    <div className="component-name">{component}</div>
-                    <div className="input-group">
-                      <label>Number of Tape Lift Samples</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={data.tape_lift}
-                        onChange={(e) => {
-                          let value = e.target.value;
-                          // Only allow whole numbers
-                          if (value !== '' && !isNaN(value)) {
-                            value = Math.floor(Math.max(0, parseFloat(value) || 0)).toString();
-                          }
-                          setMoldData({
-                            ...moldData,
-                            [component]: { ...data, tape_lift: value }
-                          });
-                        }}
-                        className="form-input small"
-                        placeholder="0"
-                      />
+              <div className="section-content">
+                <div className="input-grid">
+                  {Object.entries(moldData).map(([component, data]) => (
+                    <div key={component} className="input-row">
+                      <div className="component-name">{component}</div>
+                      <div className="input-group">
+                        <label>Number of Tape Lift Samples</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={data.tape_lift}
+                          onChange={(e) => {
+                            let value = e.target.value;
+                            // Only allow whole numbers
+                            if (value !== '' && !isNaN(value)) {
+                              value = Math.floor(Math.max(0, parseFloat(value) || 0)).toString();
+                            }
+                            setMoldData({
+                              ...moldData,
+                              [component]: { ...data, tape_lift: value }
+                            });
+                          }}
+                          className="form-input small"
+                          placeholder="0"
+                        />
+                      </div>
+                      <div className="input-group">
+                        <label>Number of Spore Trap Samples</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={data.spore_trap}
+                          onChange={(e) => {
+                            let value = e.target.value;
+                            // Only allow whole numbers
+                            if (value !== '' && !isNaN(value)) {
+                              value = Math.floor(Math.max(0, parseFloat(value) || 0)).toString();
+                            }
+                            setMoldData({
+                              ...moldData,
+                              [component]: { ...data, spore_trap: value }
+                            });
+                          }}
+                          className="form-input small"
+                          placeholder="0"
+                        />
+                      </div>
+                      <div className="input-group">
+                        <label>Number of Culturable Samples</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={data.culturable}
+                          onChange={(e) => {
+                            let value = e.target.value;
+                            // Only allow whole numbers
+                            if (value !== '' && !isNaN(value)) {
+                              value = Math.floor(Math.max(0, parseFloat(value) || 0)).toString();
+                            }
+                            setMoldData({
+                              ...moldData,
+                              [component]: { ...data, culturable: value }
+                            });
+                          }}
+                          className="form-input small"
+                          placeholder="0"
+                        />
+                      </div>
                     </div>
-                    <div className="input-group">
-                      <label>Number of Spore Trap Samples</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={data.spore_trap}
-                        onChange={(e) => {
-                          let value = e.target.value;
-                          // Only allow whole numbers
-                          if (value !== '' && !isNaN(value)) {
-                            value = Math.floor(Math.max(0, parseFloat(value) || 0)).toString();
-                          }
-                          setMoldData({
-                            ...moldData,
-                            [component]: { ...data, spore_trap: value }
-                          });
-                        }}
-                        className="form-input small"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div className="input-group">
-                      <label>Number of Culturable Samples</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={data.culturable}
-                        onChange={(e) => {
-                          let value = e.target.value;
-                          // Only allow whole numbers
-                          if (value !== '' && !isNaN(value)) {
-                            value = Math.floor(Math.max(0, parseFloat(value) || 0)).toString();
-                          }
-                          setMoldData({
-                            ...moldData,
-                            [component]: { ...data, culturable: value }
-                          });
-                        }}
-                        className="form-input small"
-                        placeholder="0"
-                      />
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                <div className="section-total">
+                  <strong>Total Tape Lift: {Math.round(moldTotals.totalTapeLift)}</strong>
+                  <strong>Total Spore Trap: {Math.round(moldTotals.totalSporeTrap)}</strong>
+                  <strong>Total Culturable: {Math.round(moldTotals.totalCulturable)}</strong>
+                </div>
               </div>
-              <div className="section-total">
-                <strong>Total Tape Lift: {Math.round(moldTotals.totalTapeLift)}</strong>
-                <strong>Total Spore Trap: {Math.round(moldTotals.totalSporeTrap)}</strong>
-                <strong>Total Culturable: {Math.round(moldTotals.totalCulturable)}</strong>
-              </div>
-            </div>
             )}
           </div>
 
           {/* ORM Section */}
           <div className="collapsible-section">
-            <div 
+            <div
               className="section-header clickable"
               onClick={() => toggleSection('orm')}
             >
@@ -864,34 +824,34 @@ const HRSEstimator = () => {
               <span className="toggle-icon">{expandedSections.orm ? '▼' : '▶'}</span>
             </div>
             {expandedSections.orm && (
-            <div className="section-content">
-              <div className="input-row">
-                <div className="input-group">
-                  <label>Building Total Square Feet</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={ormData.building_total_sf}
-                    onChange={(e) => setOrmData({ ...ormData, building_total_sf: e.target.value })}
-                    className="form-input"
-                    placeholder="0"
-                  />
-                </div>
-                <div className="input-group">
-                  <label>Estimated Hours</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={ormData.hours}
-                    onChange={(e) => setOrmData({ ...ormData, hours: e.target.value })}
-                    className="form-input"
-                    placeholder="0"
-                  />
+              <div className="section-content">
+                <div className="input-row">
+                  <div className="input-group">
+                    <label>Building Total Square Feet</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={ormData.building_total_sf}
+                      onChange={(e) => setOrmData({ ...ormData, building_total_sf: e.target.value })}
+                      className="form-input"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="input-group">
+                    <label>Estimated Hours</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={ormData.hours}
+                      onChange={(e) => setOrmData({ ...ormData, hours: e.target.value })}
+                      className="form-input"
+                      placeholder="0"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
             )}
           </div>
 
@@ -922,14 +882,14 @@ const HRSEstimator = () => {
                 Select Staff Roles
               </h3>
               <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '10px' }}>
-                Tell us what roles your {fieldStaffCount} staff member{parseInt(fieldStaffCount) !== 1 ? 's' : ''} will have. 
+                Tell us what roles your {fieldStaffCount} staff member{parseInt(fieldStaffCount) !== 1 ? 's' : ''} will have.
                 You can add multiple people with the same role (for example, 2 Environmental Scientists and 1 Technician).
               </p>
               {totalStaff !== parseInt(fieldStaffCount) && totalStaff > 0 && (
-                <div style={{ 
-                  padding: '12px', 
-                  background: '#fff3cd', 
-                  border: '1px solid #ffc107', 
+                <div style={{
+                  padding: '12px',
+                  background: '#fff3cd',
+                  border: '1px solid #ffc107',
                   borderRadius: '6px',
                   marginBottom: '10px',
                   fontSize: '0.9rem',
@@ -950,7 +910,7 @@ const HRSEstimator = () => {
 
           {/* Additional Labor Categories Section */}
           <div className="collapsible-section">
-            <div 
+            <div
               className="section-header clickable"
               onClick={() => setExpandedSections(prev => ({ ...prev, laborCategories: !prev.laborCategories }))}
             >
@@ -1047,7 +1007,7 @@ const HRSEstimator = () => {
 
           {/* Advanced Settings */}
           <div className="collapsible-section">
-            <div 
+            <div
               className="section-header clickable"
               onClick={() => setShowAdvanced(!showAdvanced)}
             >
@@ -1112,8 +1072,8 @@ const HRSEstimator = () => {
 
           {/* Submit Button */}
           <div className="form-actions">
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="submit-btn"
               disabled={loading}
             >
@@ -1189,7 +1149,7 @@ const HRSEstimator = () => {
                 </table>
               </div>
             )}
-            
+
             {estimationResult.labor_breakdown && (
               <div className="category-breakdown">
                 <h3>Hours by Category</h3>
@@ -1319,62 +1279,17 @@ const HRSEstimator = () => {
 
             {/* Detailed Calculation Breakdown */}
             {showBreakdown && (
-              <div style={{ marginTop: '30px', padding: '20px', background: '#f8f9fa', borderRadius: '8px', border: '2px solid #e0e0e0' }}>
-                <h3 style={{ marginBottom: '20px', color: '#333' }}>Detailed Calculation Breakdown</h3>
-                
-                {/* Sample Totals */}
-                <div style={{ marginBottom: '20px' }}>
-                  <h4 style={{ color: '#2c3e50', marginBottom: '10px' }}>Sample Totals</h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
-                    {estimationResult.total_plm > 0 && (
-                      <div style={{ padding: '10px', background: 'white', borderRadius: '6px', border: '1px solid #e0e0e0' }}>
-                        <strong>Total PLM Samples:</strong> {Math.round(estimationResult.total_plm)}
-                      </div>
-                    )}
-                    {estimationResult.total_xrf_shots > 0 && (
-                      <div style={{ padding: '10px', background: 'white', borderRadius: '6px', border: '1px solid #e0e0e0' }}>
-                        <strong>Total XRF Shots:</strong> {Math.round(estimationResult.total_xrf_shots)}
-                      </div>
-                    )}
-                    {estimationResult.total_chips_wipes > 0 && (
-                      <div style={{ padding: '10px', background: 'white', borderRadius: '6px', border: '1px solid #e0e0e0' }}>
-                        <strong>Total Chips/Wipes:</strong> {Math.round(estimationResult.total_chips_wipes)}
-                      </div>
-                    )}
-                    {estimationResult.total_tape_lift > 0 && (
-                      <div style={{ padding: '10px', background: 'white', borderRadius: '6px', border: '1px solid #e0e0e0' }}>
-                        <strong>Total Tape Lift:</strong> {Math.round(estimationResult.total_tape_lift)}
-                      </div>
-                    )}
-                    {estimationResult.total_spore_trap > 0 && (
-                      <div style={{ padding: '10px', background: 'white', borderRadius: '6px', border: '1px solid #e0e0e0' }}>
-                        <strong>Total Spore Trap:</strong> {Math.round(estimationResult.total_spore_trap)}
-                      </div>
-                    )}
-                    {estimationResult.total_culturable > 0 && (
-                      <div style={{ padding: '10px', background: 'white', borderRadius: '6px', border: '1px solid #e0e0e0' }}>
-                        <strong>Total Culturable:</strong> {Math.round(estimationResult.total_culturable)}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Efficiency Factor */}
-                {estimationResult.labor_breakdown && (
-                  <div style={{ marginBottom: '20px' }}>
-                    <h4 style={{ color: '#2c3e50', marginBottom: '10px' }}>Efficiency Calculation</h4>
-                    <div style={{ padding: '15px', background: 'white', borderRadius: '6px', border: '1px solid #e0e0e0' }}>
-                      <p><strong>Field Staff Count:</strong> {estimationResult.field_staff_count || estimationResult.labor_breakdown.field_staff_count}</p>
-                      <p><strong>Efficiency Factor:</strong> {estimationResult.efficiency_factor?.toFixed(2) || estimationResult.labor_breakdown.efficiency_factor?.toFixed(2)}x</p>
-                      <p style={{ fontSize: '0.9rem', color: '#666', marginTop: '8px' }}>
-                        {estimationResult.field_staff_count === 1 && '1 staff member = 1.0x efficiency'}
-                        {estimationResult.field_staff_count === 2 && '2 staff members = 0.7x efficiency'}
-                        {estimationResult.field_staff_count >= 3 && '3+ staff members = 0.6x efficiency'}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <HRSBreakdownDetails
+                details={estimationResult}
+                inputs={{
+                  field_staff_count: estimationResult?.field_staff_count || fieldStaffCount,
+                  efficiency_factor: estimationResult?.efficiency_factor || estimationResult?.labor_breakdown?.efficiency_factor || 1.0,
+                  override_minutes_asbestos: overrideMinutes.asbestos,
+                  override_minutes_xrf: overrideMinutes.xrf,
+                  override_minutes_lead: overrideMinutes.lead,
+                  override_minutes_mold: overrideMinutes.mold
+                }}
+              />
             )}
           </div>
         )}

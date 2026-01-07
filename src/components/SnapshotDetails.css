@@ -1,6 +1,6 @@
 .snapshot-details-container {
   min-height: 100vh;
-  background-color: #f5f5f5;
+  background-color: var(--bg-primary);
   padding: 2rem 0;
 }
 
@@ -317,7 +317,7 @@
 }
 
 .grand-total-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #c4cbe8 0%, #a792bc 100%);
   border-radius: 12px;
   padding: 2rem;
   text-align: center;
@@ -381,4 +381,3 @@
     gap: 0.75rem;
   }
 }
-

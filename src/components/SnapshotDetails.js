@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { estimateSnapshotAPI } from '../services/api';
+import { estimateSnapshotAPI, labFeesAPI } from '../services/api';
 import './SnapshotDetails.css';
 
 const SnapshotDetails = () => {
@@ -9,6 +9,7 @@ const SnapshotDetails = () => {
   const [snapshot, setSnapshot] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [labMetadata, setLabMetadata] = useState({ tests: {}, turnTimes: {} });
 
   useEffect(() => {
     const fetchSnapshot = async () => {
@@ -33,6 +34,53 @@ const SnapshotDetails = () => {
 
     fetchSnapshot();
   }, [snapshotId]);
+
+  // Fetch Lab Fees metadata for resolving IDs to names
+  useEffect(() => {
+    const fetchLabMetadata = async () => {
+      try {
+        const labs = await labFeesAPI.getLabs();
+        const testsMap = {};
+        const turnTimesMap = {};
+
+        // Fetch data for all labs to ensure we can resolve any legacy IDs
+        // This acts as a global lookup table
+        for (const lab of labs) {
+          const categories = await labFeesAPI.getCategories(lab.id);
+          for (const category of categories) {
+            const tests = await labFeesAPI.getTests(category.id);
+            for (const test of tests) {
+              testsMap[test.id] = {
+                name: test.name,
+                category: category.name
+              };
+
+              const rates = await labFeesAPI.getRates(test.id);
+              rates.forEach(rate => {
+                if (rate.turn_time) {
+                  // Handle both object (API) and flattened (if cached/modified) structures
+                  const turnTimeId = rate.turn_time.id || rate.turn_time_id;
+                  const label = rate.turn_time.label || rate.turn_time;
+
+                  // We map specific turn_time IDs if available, or use the label as fallback
+                  // Key format: testId-turnTimeId
+                  if (turnTimeId) {
+                    turnTimesMap[`${test.id}-${turnTimeId}`] = label;
+                  }
+                }
+              });
+            }
+          }
+        }
+        setLabMetadata({ tests: testsMap, turnTimes: turnTimesMap });
+      } catch (err) {
+        console.error('Error fetching lab metadata:', err);
+        // Ensure non-blocking failure for metadata
+      }
+    };
+
+    fetchLabMetadata();
+  }, []);
 
   const formatCurrency = (value) => {
     if (value === null || value === undefined) {
@@ -112,7 +160,7 @@ const SnapshotDetails = () => {
         {/* Header */}
         <div className="details-header">
           <div className="header-top">
-            <h1>Estimate Snapshot Details</h1>
+            <h1>Estimate Details: {snapshot.project_name}</h1>
             <div className="navigation-actions">
               <button className="btn-back" onClick={() => navigate('/previous-estimates')}>
                 ← Back to Previous Estimates
@@ -411,11 +459,43 @@ const SnapshotDetails = () => {
               <div className="module-inputs">
                 <h3>Inputs</h3>
                 {labInputs.order_details && Object.keys(labInputs.order_details).length > 0 && (
-                  <div className="data-section">
+                  <div className="data-table-section">
                     <h4>Order Details (Test Selections)</h4>
-                    <div className="json-display">
-                      <pre>{JSON.stringify(labInputs.order_details, null, 2)}</pre>
-                    </div>
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Test Name</th>
+                          <th>Service Category</th>
+                          <th>Turnaround Time</th>
+                          <th>Quantity</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(labInputs.order_details).flatMap(([testId, turnTimes]) =>
+                          Object.entries(turnTimes).map(([turnTimeId, quantity]) => {
+                            const testInfo = labMetadata.tests[testId];
+                            // Try to resolve turn time label:
+                            // 1. Look up using testId-turnTimeId key
+                            // 2. Fallback to just the ID if not found (or "Standard" if empty)
+                            const turnTimeLabel = labMetadata.turnTimes[`${testId}-${turnTimeId}`] ||
+                              (turnTimeId === '' ? 'Standard' : turnTimeId);
+
+                            return (
+                              <tr key={`${testId}-${turnTimeId}`}>
+                                <td>{testInfo ? testInfo.name : `Test #${testId}`}</td>
+                                <td>{testInfo ? testInfo.category : '-'}</td>
+                                <td>
+                                  <span className="turn-time-badge">
+                                    {turnTimeLabel}
+                                  </span>
+                                </td>
+                                <td>{formatNumber(quantity)}</td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 )}
                 {labInputs.staff_assignments && labInputs.staff_assignments.length > 0 && (

@@ -3,11 +3,11 @@ import React from 'react';
 const FlightsSection = ({ data, setData, isExpanded, onToggle }) => {
   return (
     <div className="collapsible-section">
-      <div 
+      <div
         className="section-header clickable"
         onClick={onToggle}
       >
-        <h2>Flights</h2>
+        <h2>✈️ Flights</h2>
         <span className="toggle-icon">{isExpanded ? '▼' : '▶'}</span>
       </div>
       {isExpanded && (
@@ -61,7 +61,7 @@ const FlightsSection = ({ data, setData, isExpanded, onToggle }) => {
                 />
               </div>
             </div>
-            
+
             <div className="input-row">
               <div className="input-group">
                 <label>Layover City (Optional)</label>
@@ -91,7 +91,7 @@ const FlightsSection = ({ data, setData, isExpanded, onToggle }) => {
                 </div>
               </div>
             </div>
-            
+
             {data.has_overnight && (
               <div className="input-row">
                 <div className="input-group">

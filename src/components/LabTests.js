@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useProject } from '../contexts/ProjectContext';
 import { labFeesAPI, estimateSnapshotAPI } from '../services/api';
 import ProjectHeader from './ProjectHeader';
+import LabFeesBreakdownDetails from './LabFeesBreakdownDetails';
 import './LabTests.css';
 
 /**
@@ -55,6 +57,7 @@ const HRS_TO_LAB_MAPPING = {
 const LabTests = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { project, handleProjectNotFound } = useProject();
   const [labs, setLabs] = useState([]);
   const [selectedLab, setSelectedLab] = useState(null); // Currently selected laboratory
   const [categories, setCategories] = useState([]); // Categories for selected lab
@@ -69,8 +72,7 @@ const LabTests = () => {
   const [newCategory, setNewCategory] = useState({ name: '', description: '' });
   const [newTest, setNewTest] = useState({ name: '', description: '', category: '', pricing: [] });
   const [currentTestPricing, setCurrentTestPricing] = useState([]);
-  const [projectName, setProjectName] = useState('');
-  
+
   // Staff assignments state
   const [laborRates, setLaborRates] = useState([]);
   const [staffRows, setStaffRows] = useState([{ role: '', count: 1, hours_per_person: 0 }]);
@@ -86,20 +88,10 @@ const LabTests = () => {
   // Format: Set of quantity keys (e.g., "EPA/600/R-93/116 (<1%)-24 hr") that are derived
   const [derivedQuantityKeys, setDerivedQuantityKeys] = useState(new Set()); // Track which specific rows are derived
 
-  // Load project name from localStorage on mount
-  useEffect(() => {
-    const savedProjectName = localStorage.getItem('currentProjectName');
-    if (savedProjectName) {
-      setProjectName(savedProjectName);
-    }
-  }, []);
+  // Breakdown display state
+  const [showBreakdown, setShowBreakdown] = useState(false);
 
-  // Save project name to localStorage when it changes
-  useEffect(() => {
-    if (projectName) {
-      localStorage.setItem('currentProjectName', projectName);
-    }
-  }, [projectName]);
+  // Project context is managed by ProjectProvider - no need for localStorage
 
   /**
    * Generic, mapping-driven derivation of Lab Fees quantities from HRS outputs.
@@ -128,7 +120,7 @@ const LabTests = () => {
     }
 
     const derivedQuantities = {};
-    
+
     // GENERIC RULE: Iterate over HRS_TO_LAB_MAPPING (not hardcoded cases)
     // This ensures future mappings work automatically without code changes
     Object.entries(HRS_TO_LAB_MAPPING).forEach(([mappingKey, mapping]) => {
@@ -148,7 +140,7 @@ const LabTests = () => {
 
       // Get the HRS total value using the explicit key
       const hrsValue = hrsOutputs[hrsOutputKey];
-      
+
       // GENERIC RULE: If HRS total exists, is a number, and > 0, derive Lab Fees
       if (hrsValue !== null && hrsValue !== undefined && typeof hrsValue === 'number' && hrsValue > 0) {
         // Find the matching test in categories using mapped service_category and test_name
@@ -158,10 +150,10 @@ const LabTests = () => {
               if (test.name === mapping.test_name && test.rates) {
                 // Find the rate with matching turnaround time
                 test.rates.forEach(rate => {
-                  const rateTurnTime = typeof rate.turn_time === 'string' 
-                    ? rate.turn_time 
+                  const rateTurnTime = typeof rate.turn_time === 'string'
+                    ? rate.turn_time
                     : rate.turn_time?.label || '';
-                  
+
                   if (rateTurnTime === mapping.turnaround) {
                     // Set quantity equal to HRS total (idempotent: same key = same value)
                     const key = `${test.name}-${rateTurnTime}`;
@@ -186,14 +178,14 @@ const LabTests = () => {
    * We detect HRS availability but do NOT auto-derive.
    */
   const checkHrsDataAvailability = useCallback(async () => {
-    if (!projectName) {
+    if (!project || !project.name) {
       setHrsDataAvailable(false);
       setHrsDataChanged(false);
       return;
     }
 
     try {
-      const snapshot = await estimateSnapshotAPI.getLatestSnapshot(projectName);
+      const snapshot = await estimateSnapshotAPI.getLatestSnapshot(project.name);
       if (!snapshot || !snapshot.hrs_estimator_data || !snapshot.hrs_estimator_data.outputs) {
         setHrsDataAvailable(false);
         setHrsDataChanged(false);
@@ -221,10 +213,13 @@ const LabTests = () => {
       }
     } catch (error) {
       console.error('Error checking HRS data availability:', error);
+      if (error.response?.status === 404) {
+        handleProjectNotFound();
+      }
       setHrsDataAvailable(false);
       setHrsDataChanged(false);
     }
-  }, [projectName, importedHrsSnapshotId, derivedQuantityKeys.size]);
+  }, [project, importedHrsSnapshotId, derivedQuantityKeys.size, handleProjectNotFound]);
 
   /**
    * Explicit, user-driven import of HRS sample data into Lab Fees.
@@ -240,13 +235,13 @@ const LabTests = () => {
    * 5. Marks quantities as derived (read-only)
    */
   const handleImportHrsData = async () => {
-    if (!projectName || !categories || categories.length === 0) {
+    if (!project?.name || !categories || categories.length === 0) {
       alert('Please ensure a project is selected and categories are loaded.');
       return;
     }
 
     try {
-      const snapshot = await estimateSnapshotAPI.getLatestSnapshot(projectName);
+      const snapshot = await estimateSnapshotAPI.getLatestSnapshot(project.name);
       if (!snapshot || !snapshot.hrs_estimator_data || !snapshot.hrs_estimator_data.outputs) {
         alert('No HRS sample data available for this project.');
         return;
@@ -267,7 +262,7 @@ const LabTests = () => {
       // This ensures quantities always match HRS outputs exactly
       console.log('Importing HRS sample data into Lab Fees (explicit user action, mapping-driven):', derivedQuantities);
       console.log('Derived quantities will be added to canonical order items collection:', Object.keys(derivedQuantities).length, 'items');
-      
+
       // Merge derived quantities with existing manual quantities (don't overwrite manual entries)
       setQuantities(prev => {
         const merged = { ...prev };
@@ -276,7 +271,7 @@ const LabTests = () => {
         });
         return merged;
       });
-      
+
       // Track which keys are derived (for row-level locking)
       setDerivedQuantityKeys(new Set(Object.keys(derivedQuantities)));
       setImportedHrsSnapshotId(snapshot.id);
@@ -307,14 +302,14 @@ const LabTests = () => {
     }
 
     const loadSnapshotData = async () => {
-      if (projectName) {
+      if (project?.name) {
         try {
-          const snapshot = await estimateSnapshotAPI.getLatestSnapshot(projectName);
+          const snapshot = await estimateSnapshotAPI.getLatestSnapshot(project.name);
           if (snapshot) {
             // Rehydrate staff assignments from saved Lab Fees data (separate from quantities)
             if (snapshot.lab_fees_data && snapshot.lab_fees_data.inputs) {
               const inputs = snapshot.lab_fees_data.inputs;
-              
+
               if (inputs.staff_assignments && Array.isArray(inputs.staff_assignments) && inputs.staff_assignments.length > 0) {
                 setStaffRows(inputs.staff_assignments.map(s => ({
                   role: s.role || '',
@@ -323,7 +318,7 @@ const LabTests = () => {
                 })));
                 setShowStaffSection(true);
               }
-              
+
               // Rehydrate HRS estimation ID if present
               if (inputs.hrs_estimation_id) {
                 setHrsEstimationId(inputs.hrs_estimation_id);
@@ -337,7 +332,7 @@ const LabTests = () => {
               // We need to convert order_details back to quantities format
               if (inputs.order_details && Object.keys(inputs.order_details).length > 0 && categories.length > 0) {
                 const rehydratedQuantities = {};
-                
+
                 // Convert order_details (testId -> turnTimeId -> quantity) to quantities (testName-turnTime -> quantity)
                 Object.entries(inputs.order_details).forEach(([testId, turnTimeMap]) => {
                   // Find the test by ID
@@ -348,7 +343,7 @@ const LabTests = () => {
                       if (foundTest) break;
                     }
                   }
-                  
+
                   if (foundTest) {
                     // For each turnTime in the map
                     Object.entries(turnTimeMap).forEach(([turnTimeId, quantity]) => {
@@ -358,10 +353,10 @@ const LabTests = () => {
                           const rateTurnTimeId = r.turn_time_id?.toString() || '';
                           return rateTurnTimeId === turnTimeId || turnTimeId === '';
                         });
-                        
+
                         if (rate) {
-                          const turnTimeStr = typeof rate.turn_time === 'string' 
-                            ? rate.turn_time 
+                          const turnTimeStr = typeof rate.turn_time === 'string'
+                            ? rate.turn_time
                             : rate.turn_time?.label || 'unknown';
                           const key = `${foundTest.name}-${turnTimeStr}`;
                           rehydratedQuantities[key] = quantity;
@@ -370,12 +365,12 @@ const LabTests = () => {
                     });
                   }
                 });
-                
+
                 // Rehydrate quantities from snapshot.inputs only
                 // Check import metadata stored in inputs (not HRS outputs)
                 const wasImported = inputs.quantities_imported_from_hrs === true;
                 const savedSnapshotId = inputs.imported_hrs_snapshot_id;
-                
+
                 if (wasImported && savedSnapshotId) {
                   // Quantities were imported from HRS - restore with import metadata
                   // ROW-LEVEL LOCKING: Track which specific keys are derived
@@ -419,21 +414,22 @@ const LabTests = () => {
         setImportedHrsSnapshotId(null);
       }
     };
-    
+
     loadSnapshotData();
-  }, [projectName, categories, location.pathname, checkHrsDataAvailability]); // location.pathname triggers on route change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project, categories, location.pathname, checkHrsDataAvailability]); // location.pathname triggers on route change
 
   const fetchLabs = async () => {
     try {
       setLoading(true);
       setError(null);
       console.log('Fetching laboratories...');
-      
+
       // Fetch all laboratories
       const labsData = await labFeesAPI.getLabs();
       console.log('Received labs:', labsData);
       setLabs(labsData);
-      
+
       // Select first lab if available
       if (labsData.length > 0) {
         setSelectedLab(labsData[0]);
@@ -448,7 +444,7 @@ const LabTests = () => {
 
   useEffect(() => {
     fetchLabs();
-    
+
     // Fetch labor rates on mount - exactly like HRS Estimator
     const fetchLaborRates = async () => {
       try {
@@ -473,7 +469,7 @@ const LabTests = () => {
       if (event.detail?.estimationId) {
         setHrsEstimationId(event.detail.estimationId);
         setShowStaffSection(true); // Show staff section when HRS estimation is done
-        
+
         // Check HRS data availability (for showing import button)
         // Do NOT auto-derive - user must explicitly import
         await checkHrsDataAvailability();
@@ -482,13 +478,14 @@ const LabTests = () => {
         fetchCategoriesForLab(selectedLab.id);
       }
     };
-    
+
     window.addEventListener('hrs-estimation-complete', handleHrsEstimationComplete);
-    
+
     return () => {
       window.removeEventListener('hrs-estimation-complete', handleHrsEstimationComplete);
     };
-  }, [selectedLab, projectName, checkHrsDataAvailability]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLab, project, checkHrsDataAvailability]);
 
 
   // Fetch categories when lab is selected
@@ -502,12 +499,12 @@ const LabTests = () => {
     try {
       console.log('Fetching categories for lab:', labId);
       const categoriesData = await labFeesAPI.getCategories(labId);
-      
+
       // Fetch tests for each category
       const categoriesWithTests = await Promise.all(
         categoriesData.map(async (category) => {
           const tests = await labFeesAPI.getTests(category.id);
-          
+
           // Fetch rates for each test
           const testsWithRates = await Promise.all(
             tests.map(async (test) => {
@@ -523,17 +520,17 @@ const LabTests = () => {
               };
             })
           );
-          
+
           return {
             ...category,
             tests: testsWithRates
           };
         })
       );
-      
+
       console.log('Categories with tests:', categoriesWithTests);
       setCategories(categoriesWithTests);
-      
+
       // Select first category if available
       if (categoriesWithTests.length > 0) {
         setSelectedCategory(categoriesWithTests[0]);
@@ -548,7 +545,7 @@ const LabTests = () => {
       // After categories load, check HRS data availability (for showing import button)
       // DESIGN DECISION: Explicit import model - do NOT auto-derive
       // We only check availability, user must explicitly click "Import HRS Sample Data"
-      if (projectName && categoriesWithTests.length > 0) {
+      if (project && project.name && categoriesWithTests.length > 0) {
         checkHrsDataAvailability();
       }
     } catch (err) {
@@ -606,7 +603,7 @@ const LabTests = () => {
       return filtered;
     });
     setSelectedTurnTime(null);
-    
+
     // If category has tests, select the first one
     if (category.tests && category.tests.length > 0) {
       setSelectedTest(category.tests[0]);
@@ -662,7 +659,7 @@ const LabTests = () => {
         }
         const testName = key.substring(0, lastDashIndex);
         const turnTime = key.substring(lastDashIndex + 1);
-        
+
         // Search across ALL categories to find the test
         // Derived quantities may be in different categories than selectedCategory
         let found = false;
@@ -671,15 +668,15 @@ const LabTests = () => {
             for (const test of category.tests) {
               if (test.name === testName && test.rates) {
                 for (const rate of test.rates) {
-                  const rateTurnTime = typeof rate.turn_time === 'string' 
-                    ? rate.turn_time 
+                  const rateTurnTime = typeof rate.turn_time === 'string'
+                    ? rate.turn_time
                     : rate.turn_time?.label || 'unknown';
-                  
+
                   if (rateTurnTime === turnTime) {
                     const rateCost = quantity * (rate.price || 0);
                     totalSamples += quantity;
                     totalCost += rateCost;
-                    
+
                     breakdown.push({
                       categoryName: category.name,
                       testName: test.name,
@@ -698,10 +695,10 @@ const LabTests = () => {
             if (found) break;
           }
         }
-        
+
         // Log warning if quantity exists but test/rate not found (debugging)
         if (!found && categories.length > 0) {
-          console.warn(`Order Summary: Could not find test/rate for "${testName}" / "${turnTime}". Available categories:`, 
+          console.warn(`Order Summary: Could not find test/rate for "${testName}" / "${turnTime}". Available categories:`,
             categories.map(c => c.name).join(', '));
         }
       }
@@ -796,21 +793,21 @@ const LabTests = () => {
           if (lastDashIndex === -1) return;
           const testName = key.substring(0, lastDashIndex);
           const turnTime = key.substring(lastDashIndex + 1);
-          
+
           // Find the test and rate to get IDs
           categories.forEach(category => {
             if (category.tests) {
               category.tests.forEach(test => {
                 if (test.name === testName && test.rates) {
                   test.rates.forEach(rate => {
-                    const rateTurnTime = typeof rate.turn_time === 'string' 
-                      ? rate.turn_time 
+                    const rateTurnTime = typeof rate.turn_time === 'string'
+                      ? rate.turn_time
                       : rate.turn_time?.label || 'unknown';
-                    
+
                     if (rateTurnTime === turnTime) {
                       const testId = test.id.toString();
                       const turnTimeId = rate.turn_time_id?.toString() || '';
-                      
+
                       if (!orderDetails[testId]) {
                         orderDetails[testId] = {};
                       }
@@ -834,7 +831,7 @@ const LabTests = () => {
         }));
 
       const orderData = {
-        project_name: projectName || null,
+        project_name: project?.name || null,
         hrs_estimation_id: hrsEstimationId,
         order_details: orderDetails,
         staff_assignments: staffAssignments,
@@ -907,39 +904,39 @@ const LabTests = () => {
 
   return (
     <div className="lab-tests-container">
-      <nav className="lab-tests-nav">
-        <Link to="/" className="nav-link">
+      <nav className="app-top-nav">
+        <button onClick={() => navigate('/')} className="nav-action-btn">
           Home
-        </Link>
+        </button>
         <div className="nav-title">
           <h1>Lab Fee Calculator</h1>
         </div>
-        <button 
-          className="add-category-btn"
+        <button
+          className="nav-action-btn"
           onClick={() => setShowAddCategoryModal(true)}
         >
           Add New Category
         </button>
       </nav>
-      
-      <header className="lab-tests-header">
+
+      {/* <header className="lab-tests-header">
         <p>Calculate costs for laboratory testing services</p>
-      </header>
+      </header> */}
 
       {/* Project Header with Navigation */}
-      <ProjectHeader projectName={projectName} moduleName="lab" />
+      <ProjectHeader projectName={project?.name} moduleName="lab" />
 
       {/* HRS Data Changed Warning Banner */}
       {hrsDataChanged && (
-        <div style={{ 
-          maxWidth: '1200px', 
-          margin: '0 auto 20px', 
-          padding: '0 20px' 
+        <div style={{
+          maxWidth: '1200px',
+          margin: '0 auto 20px',
+          padding: '0 20px'
         }}>
-          <div style={{ 
-            background: '#fff3cd', 
-            border: '2px solid #ffc107', 
-            borderRadius: '8px', 
+          <div style={{
+            background: '#fff3cd',
+            border: '2px solid #ffc107',
+            borderRadius: '8px',
             padding: '15px 20px',
             display: 'flex',
             alignItems: 'center',
@@ -977,15 +974,15 @@ const LabTests = () => {
 
       {/* HRS Data Available Banner */}
       {hrsDataAvailable && !hrsDataChanged && (
-        <div style={{ 
-          maxWidth: '1200px', 
-          margin: '0 auto 20px', 
-          padding: '0 20px' 
+        <div style={{
+          maxWidth: '1200px',
+          margin: '0 auto 20px',
+          padding: '0 20px'
         }}>
-          <div style={{ 
-            background: '#d1ecf1', 
-            border: '2px solid #17a2b8', 
-            borderRadius: '8px', 
+          <div style={{
+            background: '#d1ecf1',
+            border: '2px solid #17a2b8',
+            borderRadius: '8px',
             padding: '15px 20px',
             display: 'flex',
             alignItems: 'center',
@@ -1021,39 +1018,14 @@ const LabTests = () => {
         </div>
       )}
 
-      {/* Project Name Input */}
-      <div style={{ maxWidth: '1200px', margin: '0 auto 20px', padding: '0 20px' }}>
-        <div style={{ background: 'white', padding: '15px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-          <label htmlFor="lab-project-name" style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#2c3e50' }}>
-            Project Name
-          </label>
-          <input
-            id="lab-project-name"
-            type="text"
-            value={projectName}
-            onChange={(e) => setProjectName(e.target.value)}
-            placeholder="Enter project name (e.g., 'One Sample')"
-            style={{
-              width: '100%',
-              padding: '10px 15px',
-              border: '2px solid #e0e0e0',
-              borderRadius: '6px',
-              fontSize: '1rem'
-            }}
-          />
-          <small style={{ fontSize: '0.85rem', color: '#666', marginTop: '4px', display: 'block' }}>
-            This project name will be shared across all modules
-          </small>
-        </div>
-      </div>
 
       <div className="lab-tests-content">
         {/* Laboratory Selector and Categories Sidebar */}
         <div className="categories-sidebar">
           <div className="lab-selector-section">
             <h3>Select Laboratory</h3>
-            <select 
-              value={selectedLab?.id || ''} 
+            <select
+              value={selectedLab?.id || ''}
               onChange={(e) => {
                 const lab = labs.find(l => l.id === parseInt(e.target.value));
                 if (lab) handleLabChange(lab);
@@ -1095,7 +1067,7 @@ const LabTests = () => {
                   <h2>{selectedCategory.name}</h2>
                   <p>{selectedCategory.description}</p>
                 </div>
-                <button 
+                <button
                   className="add-test-btn"
                   onClick={() => {
                     setNewTest({ ...newTest, category: selectedCategory.name });
@@ -1112,9 +1084,8 @@ const LabTests = () => {
                   selectedCategory.tests.map((test) => (
                     <div
                       key={test.id}
-                      className={`test-card ${
-                        selectedTest?.id === test.id ? 'selected' : ''
-                      }`}
+                      className={`test-card ${selectedTest?.id === test.id ? 'selected' : ''
+                        }`}
                       onClick={() => setSelectedTest(test)}
                     >
                       <h4>{test.name}</h4>
@@ -1159,32 +1130,42 @@ const LabTests = () => {
                         const quantity = getQuantityForTurnaround(selectedTest.name, turnTimeStr);
                         const isSelected = selectedTurnTime === turnTimeStr;
                         const totalCost = quantity > 0 ? rate.price * quantity : 0;
-                        
+
                         // ROW-LEVEL LOCKING: Check if THIS specific row is derived from HRS
                         // Only derived rows are read-only - manual rows remain fully editable
                         const quantityKey = `${selectedTest.name}-${turnTimeStr}`;
                         const isDerivedRow = derivedQuantityKeys.has(quantityKey);
-                        
+
                         return (
-                          <div 
-                            key={`${rate.id}-${turnTimeStr}-${rate.hours}`} 
+                          <div
+                            key={`${rate.id}-${turnTimeStr}-${rate.hours}`}
                             className={`pricing-row ${isSelected ? 'selected' : ''}`}
                           >
                             <div className="quantity-controls">
                               {/* ROW-LEVEL LOCKING: Only derived rows are read-only */}
                               {/* Manual rows remain fully editable even after HRS import */}
                               <input
-                                type="number"
-                                min="0"
-                                value={quantity}
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                value={quantity === 0 ? '' : quantity}
                                 readOnly={isDerivedRow}
                                 disabled={isDerivedRow}
                                 className="quantity-input"
                                 onChange={(e) => {
                                   if (!isDerivedRow) {
-                                    // Manual entry - allow editing and mark as non-derived
-                                    handleQuantityChange(selectedTest.name, turnTimeStr, e.target.value);
-                                    // Remove from derived set if it was previously derived (shouldn't happen, but safety)
+                                    const val = e.target.value;
+                                    // Allow empty string (clearing input)
+                                    if (val === '') {
+                                      handleQuantityChange(selectedTest.name, turnTimeStr, 0);
+                                    }
+                                    // Validate strictly whole numbers
+                                    else if (/^\d+$/.test(val)) {
+                                      handleQuantityChange(selectedTest.name, turnTimeStr, parseInt(val, 10));
+                                    }
+                                    // Ignore invalid characters (non-digits)
+
+                                    // Remove from derived set if needed
                                     if (derivedQuantityKeys.has(quantityKey)) {
                                       setDerivedQuantityKeys(prev => {
                                         const next = new Set(prev);
@@ -1194,21 +1175,22 @@ const LabTests = () => {
                                     }
                                   }
                                 }}
-                                style={{ 
-                                  backgroundColor: isDerivedRow ? '#f5f5f5' : 'white', 
+                                style={{
+                                  backgroundColor: isDerivedRow ? '#f5f5f5' : 'white',
                                   cursor: isDerivedRow ? 'not-allowed' : 'text',
                                   opacity: isDerivedRow ? 0.7 : 1,
                                   border: isDerivedRow ? '2px solid #e0e0e0' : '2px solid #ccc'
                                 }}
-                                title={isDerivedRow 
+                                title={isDerivedRow
                                   ? "This quantity is derived from HRS Sample Estimator outputs and cannot be manually edited"
                                   : "Enter quantity for this test"
                                 }
+                                placeholder="0"
                               />
                               {quantity > 0 && isDerivedRow && (
-                                <span style={{ 
-                                  fontSize: '0.75rem', 
-                                  color: '#27ae60', 
+                                <span style={{
+                                  fontSize: '0.75rem',
+                                  color: '#27ae60',
                                   fontStyle: 'italic',
                                   marginLeft: '8px',
                                   fontWeight: 600
@@ -1217,7 +1199,7 @@ const LabTests = () => {
                                 </span>
                               )}
                             </div>
-                            <div 
+                            <div
                               className="turn-time"
                               onClick={() => setSelectedTurnTime(turnTimeStr)}
                             >
@@ -1236,9 +1218,9 @@ const LabTests = () => {
                               <div className="price">{formatPrice(rate.price)}</div>
                               {rate.sample_count && rate.sample_count > 0 ? (
                                 <div className="rate-total-cost">
-                                  ${(rate.sample_count * rate.price).toLocaleString('en-US', { 
-                                    minimumFractionDigits: 2, 
-                                    maximumFractionDigits: 2 
+                                  ${(rate.sample_count * rate.price).toLocaleString('en-US', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2
                                   })}
                                 </div>
                               ) : (
@@ -1269,7 +1251,7 @@ const LabTests = () => {
         return (
           <div className="total-cost-summary">
             <div className="summary-container">
-              <h3>Order Summary</h3>
+              <h3> Order Summary</h3>
               <div className="summary-details">
                 <div className="summary-item">
                   <span>Total Cost:</span>
@@ -1291,18 +1273,16 @@ const LabTests = () => {
 
       {/* HRS-derived notice */}
       {derivedQuantityKeys.size > 0 && Object.keys(quantities).length > 0 && (
-        <div style={{ 
-          maxWidth: '1200px', 
-          margin: '20px auto', 
+        <div style={{
           maxWidth: '1200px',
-          margin: '20px auto',
+          margin: '5px auto 20px',
           padding: '12px 20px',
           background: '#e8f5e9',
           border: '2px solid #27ae60',
           borderRadius: '8px'
         }}>
           <p style={{ margin: 0, color: '#2c3e50', fontWeight: 600 }}>
-            ℹ️ Lab Fees quantities are derived from HRS Sample Estimator outputs. 
+            ℹ️ Lab Fees quantities are derived from HRS Sample Estimator outputs.
             Quantities match HRS totals exactly and cannot be manually edited.
           </p>
         </div>
@@ -1313,182 +1293,182 @@ const LabTests = () => {
         const { totalSamples } = calculateOrderSummary();
         return (showStaffSection || staffRows.some(row => row.role) || totalSamples > 0);
       })() && (
-        <div style={{ maxWidth: '1200px', margin: '30px auto', padding: '0 20px' }}>
-          <div style={{ background: 'white', padding: '25px', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ color: '#2c3e50', margin: 0 }}>Field Collection Staff</h3>
-              <button
-                onClick={() => setShowStaffSection(!showStaffSection)}
-                style={{
-                  padding: '8px 16px',
-                  background: showStaffSection ? '#e74c3c' : '#27ae60',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem',
-                  fontWeight: '600'
-                }}
-              >
-                {showStaffSection ? '▼ Hide' : '▶ Show'} Staff Section
-              </button>
-            </div>
-            
-            {showStaffSection && (
-              <div>
-                <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '20px' }}>
-                  Add staff who will collect the samples. Enter their role, how many people, and how many hours each person will work.
-                </p>
-                
-                <div style={{ marginBottom: '20px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1.5fr 1fr auto', gap: '15px', marginBottom: '10px', padding: '10px', background: '#f8f9fa', borderRadius: '6px', fontWeight: '600', fontSize: '0.9rem', color: '#2c3e50' }}>
-                    <div>Role</div>
-                    <div>Count</div>
-                    <div>Hours per Person</div>
-                    <div>Hourly Rate</div>
-                    <div></div>
-                  </div>
-                  
-                  {staffRows.map((row, index) => {
-                    const rate = getRoleRate(row.role);
-                    const totalHours = row.count * row.hours_per_person;
-                    const totalCost = rate ? totalHours * rate : 0;
-                    
-                    return (
-                      <div key={index} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1.5fr 1fr auto', gap: '15px', padding: '15px', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '6px', marginBottom: '10px', alignItems: 'center' }}>
-                        <select
-                          value={row.role}
-                          onChange={(e) => handleStaffRoleChange(index, e.target.value)}
-                          style={{
-                            padding: '10px',
-                            border: '2px solid #e0e0e0',
-                            borderRadius: '6px',
-                            fontSize: '0.95rem'
-                          }}
-                        >
-                          <option value="">-- Select Role --</option>
-                          {laborRates.map((rateEntry) => (
-                            <option key={rateEntry.labor_role} value={rateEntry.labor_role}>
-                              {rateEntry.labor_role} (${rateEntry.hourly_rate.toFixed(2)}/hr)
-                            </option>
-                          ))}
-                        </select>
-                        
-                        <input
-                          type="number"
-                          min="1"
-                          step="1"
-                          value={row.count}
-                          onChange={(e) => handleStaffCountChange(index, e.target.value)}
-                          style={{
-                            padding: '10px',
-                            border: '2px solid #e0e0e0',
-                            borderRadius: '6px',
-                            fontSize: '0.95rem'
-                          }}
-                          placeholder="1"
-                        />
-                        
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.25"
-                          value={row.hours_per_person}
-                          onChange={(e) => handleStaffHoursChange(index, e.target.value)}
-                          style={{
-                            padding: '10px',
-                            border: '2px solid #e0e0e0',
-                            borderRadius: '6px',
-                            fontSize: '0.95rem'
-                          }}
-                          placeholder="0"
-                        />
-                        
-                        <div style={{ fontSize: '0.9rem', color: '#666' }}>
-                          {rate ? `$${rate.toFixed(2)}/hr` : 'N/A'}
-                        </div>
-                        
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (row.role) {
-                              // Clear the selection (delete function)
-                              const newRows = [...staffRows];
-                              newRows[index] = { role: '', count: 1, hours_per_person: 0 };
-                              setStaffRows(newRows);
-                            } else {
-                              // Remove the row if no role selected
-                              handleRemoveStaffRow(index);
-                            }
-                          }}
-                          className={row.role ? 'delete-staff-btn' : ''}
-                          style={!row.role ? {
-                            padding: '8px 12px',
-                            background: staffRows.length === 1 ? '#ccc' : '#e74c3c',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: staffRows.length > 1 ? 'pointer' : 'not-allowed',
-                            fontSize: '0.9rem',
-                            fontWeight: 'bold'
-                          } : {}}
-                          disabled={!row.role && staffRows.length === 1}
-                          title={row.role ? 'Delete selected staff' : 'Remove row'}
-                        >
-                          {row.role ? (
-                            <>
-                              <span>🗑️</span>
-                              <span>Delete</span>
-                            </>
-                          ) : (
-                            '✕'
-                          )}
-                        </button>
-                        
-                        {row.role && row.count > 0 && row.hours_per_person > 0 && rate && (
-                          <div style={{ gridColumn: '1 / -1', padding: '10px', background: '#e8f5e9', borderRadius: '6px', marginTop: '10px', fontSize: '0.9rem', color: '#2e7d32' }}>
-                            <strong>Total for {row.role}:</strong> {row.count} person{row.count !== 1 ? 's' : ''} × {row.hours_per_person} hours = {totalHours.toFixed(2)} hours × ${rate.toFixed(2)}/hr = <strong>${totalCost.toFixed(2)}</strong>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  
-                  <button
-                    type="button"
-                    onClick={handleAddStaffRow}
-                    style={{
-                      padding: '12px 20px',
-                      background: '#3498db',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '0.95rem',
-                      fontWeight: '600',
-                      marginTop: '10px'
-                    }}
-                  >
-                    Add Another Staff Member
-                  </button>
-                </div>
+          <div style={{ maxWidth: '1200px', margin: '10px auto 30px', padding: '0 20px' }}>
+            <div style={{ background: 'white', padding: '25px', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h3 style={{ color: '#2c3e50', margin: 0 }}>Field Collection Staff</h3>
+                <button
+                  onClick={() => setShowStaffSection(!showStaffSection)}
+                  style={{
+                    padding: '8px 16px',
+                    background: showStaffSection ? '#e74c3c' : '#27ae60',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '600'
+                  }}
+                >
+                  {showStaffSection ? '▼ Hide' : '▶ Show'} Staff Section
+                </button>
               </div>
-            )}
+
+              {showStaffSection && (
+                <div>
+                  <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '20px' }}>
+                    Add staff who will collect the samples. Enter their role, how many people, and how many hours each person will work.
+                  </p>
+
+                  <div style={{ marginBottom: '20px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1.5fr 1fr auto', gap: '15px', marginBottom: '10px', padding: '10px', background: '#f8f9fa', borderRadius: '6px', fontWeight: '600', fontSize: '0.9rem', color: '#2c3e50' }}>
+                      <div>Role</div>
+                      <div>Count</div>
+                      <div>Hours per Person</div>
+                      <div>Hourly Rate</div>
+                      <div></div>
+                    </div>
+
+                    {staffRows.map((row, index) => {
+                      const rate = getRoleRate(row.role);
+                      const totalHours = row.count * row.hours_per_person;
+                      const totalCost = rate ? totalHours * rate : 0;
+
+                      return (
+                        <div key={index} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1.5fr 1fr auto', gap: '15px', padding: '15px', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '6px', marginBottom: '10px', alignItems: 'center' }}>
+                          <select
+                            value={row.role}
+                            onChange={(e) => handleStaffRoleChange(index, e.target.value)}
+                            style={{
+                              padding: '10px',
+                              border: '2px solid #e0e0e0',
+                              borderRadius: '6px',
+                              fontSize: '0.95rem'
+                            }}
+                          >
+                            <option value="">-- Select Role --</option>
+                            {laborRates.map((rateEntry) => (
+                              <option key={rateEntry.labor_role} value={rateEntry.labor_role}>
+                                {rateEntry.labor_role} (${rateEntry.hourly_rate.toFixed(2)}/hr)
+                              </option>
+                            ))}
+                          </select>
+
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={row.count}
+                            onChange={(e) => handleStaffCountChange(index, e.target.value)}
+                            style={{
+                              padding: '10px',
+                              border: '2px solid #e0e0e0',
+                              borderRadius: '6px',
+                              fontSize: '0.95rem'
+                            }}
+                            placeholder="1"
+                          />
+
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.25"
+                            value={row.hours_per_person}
+                            onChange={(e) => handleStaffHoursChange(index, e.target.value)}
+                            style={{
+                              padding: '10px',
+                              border: '2px solid #e0e0e0',
+                              borderRadius: '6px',
+                              fontSize: '0.95rem'
+                            }}
+                            placeholder="0"
+                          />
+
+                          <div style={{ fontSize: '0.9rem', color: '#666' }}>
+                            {rate ? `$${rate.toFixed(2)}/hr` : 'N/A'}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (row.role) {
+                                // Clear the selection (delete function)
+                                const newRows = [...staffRows];
+                                newRows[index] = { role: '', count: 1, hours_per_person: 0 };
+                                setStaffRows(newRows);
+                              } else {
+                                // Remove the row if no role selected
+                                handleRemoveStaffRow(index);
+                              }
+                            }}
+                            className={row.role ? 'delete-staff-btn' : ''}
+                            style={!row.role ? {
+                              padding: '8px 12px',
+                              background: staffRows.length === 1 ? '#ccc' : '#e74c3c',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: staffRows.length > 1 ? 'pointer' : 'not-allowed',
+                              fontSize: '0.9rem',
+                              fontWeight: 'bold'
+                            } : {}}
+                            disabled={!row.role && staffRows.length === 1}
+                            title={row.role ? 'Delete selected staff' : 'Remove row'}
+                          >
+                            {row.role ? (
+                              <>
+                                <span>🗑️</span>
+                                <span>Delete</span>
+                              </>
+                            ) : (
+                              '✕'
+                            )}
+                          </button>
+
+                          {row.role && row.count > 0 && row.hours_per_person > 0 && rate && (
+                            <div style={{ gridColumn: '1 / -1', padding: '10px', background: '#e8f5e9', borderRadius: '6px', marginTop: '10px', fontSize: '0.9rem', color: '#2e7d32' }}>
+                              <strong>Total for {row.role}:</strong> {row.count} person{row.count !== 1 ? 's' : ''} × {row.hours_per_person} hours = {totalHours.toFixed(2)} hours × ${rate.toFixed(2)}/hr = <strong>${totalCost.toFixed(2)}</strong>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    <button
+                      type="button"
+                      onClick={handleAddStaffRow}
+                      style={{
+                        padding: '12px 20px',
+                        background: '#3498db',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.95rem',
+                        fontWeight: '600',
+                        marginTop: '10px'
+                      }}
+                    >
+                      Add Another Staff Member
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Order Summary - Based on sample_count */}
       {(() => {
         const { totalSamples, totalCost, breakdown } = calculateOrderSummary();
         const { totalCost: staffCost, breakdown: staffBreakdown } = calculateStaffCosts();
         const grandTotal = totalCost + staffCost;
-        
+
         if (totalSamples > 0 || totalCost > 0 || staffCost > 0) {
           return (
             <div className="order-summary-container">
               <div className="order-summary-card">
-                <h3>Order Summary</h3>
+                <h3>Grand Total</h3>
                 <div className="order-summary-details">
                   {/* Breakdown by test and turnaround time */}
                   {breakdown.length > 0 && (
@@ -1505,9 +1485,9 @@ const LabTests = () => {
                               {item.sampleCount.toLocaleString('en-US')} samples
                             </span>
                             <span className="breakdown-cost">
-                              ${item.cost.toLocaleString('en-US', { 
-                                minimumFractionDigits: 2, 
-                                maximumFractionDigits: 2 
+                              ${item.cost.toLocaleString('en-US', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2
                               })}
                             </span>
                           </div>
@@ -1515,7 +1495,7 @@ const LabTests = () => {
                       ))}
                     </div>
                   )}
-                  
+
                   {/* Staff Labor Costs */}
                   {staffCost > 0 && staffBreakdown.length > 0 && (
                     <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '2px solid #e0e0e0' }}>
@@ -1538,7 +1518,7 @@ const LabTests = () => {
                       </div>
                     </div>
                   )}
-                  
+
                   {/* Totals */}
                   <div className="order-summary-totals">
                     <div className="order-summary-item">
@@ -1550,9 +1530,9 @@ const LabTests = () => {
                     <div className="order-summary-item">
                       <span className="order-summary-label">Lab Fees Cost:</span>
                       <span className="order-summary-value">
-                        ${totalCost.toLocaleString('en-US', { 
-                          minimumFractionDigits: 2, 
-                          maximumFractionDigits: 2 
+                        ${totalCost.toLocaleString('en-US', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
                         })}
                       </span>
                     </div>
@@ -1560,9 +1540,9 @@ const LabTests = () => {
                       <div className="order-summary-item">
                         <span className="order-summary-label">Field Collection Labor Cost:</span>
                         <span className="order-summary-value">
-                          ${staffCost.toLocaleString('en-US', { 
-                            minimumFractionDigits: 2, 
-                            maximumFractionDigits: 2 
+                          ${staffCost.toLocaleString('en-US', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
                           })}
                         </span>
                       </div>
@@ -1570,14 +1550,14 @@ const LabTests = () => {
                     <div className="order-summary-item highlight">
                       <span className="order-summary-label">Grand Total:</span>
                       <span className="order-summary-value order-summary-total">
-                        ${grandTotal.toLocaleString('en-US', { 
-                          minimumFractionDigits: 2, 
-                          maximumFractionDigits: 2 
+                        ${grandTotal.toLocaleString('en-US', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
                         })}
                       </span>
                     </div>
                   </div>
-                  
+
                   {/* Save Order Button */}
                   <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '2px solid #e0e0e0', textAlign: 'center' }}>
                     <button
@@ -1607,42 +1587,92 @@ const LabTests = () => {
                       💾 Save Order
                     </button>
                   </div>
-                  
-                  {/* Add Labor Button */}
-                  <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '2px solid #e0e0e0', textAlign: 'center' }}>
-                    <button
-                      onClick={() => {
-                        navigate('/hrs-estimator', {
-                          state: { projectName: projectName }
-                        });
-                      }}
-                      style={{
-                        padding: '12px 30px',
-                        background: 'linear-gradient(135deg, #3498db, #2980b9)',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontSize: '1rem',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        transition: 'all 0.3s ease',
-                        boxShadow: '0 4px 12px rgba(52, 152, 219, 0.3)'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.transform = 'translateY(-2px)';
-                        e.target.style.boxShadow = '0 6px 16px rgba(52, 152, 219, 0.4)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.transform = 'translateY(0)';
-                        e.target.style.boxShadow = '0 4px 12px rgba(52, 152, 219, 0.3)';
-                      }}
-                    >
-                      ➕ Add Labor Estimation
-                    </button>
-                    <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '10px' }}>
-                      Estimate field hours and labor costs for these samples
-                    </p>
-                  </div>
+
+                  {/* Add Labor Button REMOVED */}
+
+                  {/* Calculation Breakdown Toggle */}
+                  {(totalSamples > 0 || totalCost > 0 || staffCost > 0) && (
+                    <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '2px solid #e0e0e0', textAlign: 'center' }}>
+                      <button
+                        className={`show-breakdown-btn ${showBreakdown ? 'active' : ''}`}
+                        onClick={() => setShowBreakdown(!showBreakdown)}
+                        style={{
+                          padding: '12px 24px',
+                          background: showBreakdown ? '#27ae60' : '#95a5a6',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontSize: '1rem',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease'
+                        }}
+                      >
+                        {showBreakdown ? '▼ Hide Calculation Breakdown' : '▶ Show Calculation Breakdown'}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Detailed Calculation Breakdown */}
+                  {showBreakdown && (() => {
+                    const { totalSamples: breakdownSamples, totalCost: breakdownCost, breakdown: breakdownList } = calculateOrderSummary();
+                    const { totalCost: breakdownStaffCost, breakdown: breakdownStaffList } = calculateStaffCosts();
+
+                    // Build order_details format for breakdown component
+                    const orderDetails = {};
+                    breakdownList.forEach(item => {
+                      // Find test ID and turn time ID from categories
+                      for (const category of categories) {
+                        if (category.tests) {
+                          for (const test of category.tests) {
+                            if (test.name === item.testName && test.rates) {
+                              const testId = test.id;
+                              if (!orderDetails[testId]) {
+                                orderDetails[testId] = {};
+                              }
+                              for (const rate of test.rates) {
+                                const rateTurnTime = typeof rate.turn_time === 'string'
+                                  ? rate.turn_time
+                                  : rate.turn_time?.label || '';
+                                if (rateTurnTime === item.turnTime) {
+                                  const turnTimeId = typeof rate.turn_time === 'object'
+                                    ? rate.turn_time?.id
+                                    : rate.turn_time_id;
+                                  orderDetails[testId][turnTimeId] = item.sampleCount;
+                                  break;
+                                }
+                              }
+                              break;
+                            }
+                          }
+                        }
+                      }
+                    });
+
+                    return (
+                      <LabFeesBreakdownDetails
+                        details={{
+                          total_samples: breakdownSamples,
+                          total_lab_fees_cost: breakdownCost,
+                          total_staff_labor_cost: breakdownStaffCost,
+                          total_cost: breakdownCost + breakdownStaffCost,
+                          staff_breakdown: breakdownStaffList.map(item => ({
+                            role: item.role,
+                            count: item.count,
+                            total_hours: item.total_hours
+                          })),
+                          staff_labor_costs: breakdownStaffList.reduce((acc, item) => {
+                            acc[item.role] = item.cost;
+                            return acc;
+                          }, {})
+                        }}
+                        inputs={{
+                          order_details: orderDetails
+                        }}
+                        categories={categories}
+                      />
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -1753,7 +1783,7 @@ const LabTests = () => {
                   className="readonly-input"
                 />
               </div>
-              
+
               {/* Pricing Section */}
               <div className="form-group">
                 <label>Pricing (Turnaround Times & Prices):</label>

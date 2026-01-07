@@ -1,14 +1,20 @@
-/* Home Page Styles */
+/* Dashboard / Home Page Styles - Professional ERP Theme */
 .home-container {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  padding-bottom: 40px;
 }
 
+/* Hero becomes the Dashboard Header */
 .home-hero {
-  padding: 80px 20px;
-  text-align: center;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.9), rgba(118, 75, 162, 0.9));
+  padding: 40px 32px 32px;
+  /* Reduced vertical padding */
+  text-align: left;
+  /* Align left */
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 32px;
 }
 
 .hero-content {
@@ -17,282 +23,337 @@
 }
 
 .hero-content h1 {
-  font-size: 3.5rem;
-  margin-bottom: 20px;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-  font-weight: bold;
+  font-size: 2rem;
+  margin-bottom: 12px;
+  text-shadow: none;
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
 .hero-subtitle {
-  font-size: 1.3rem;
-  margin-bottom: 50px;
-  opacity: 0.9;
-  max-width: 600px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.hero-features {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 30px;
-  margin-bottom: 50px;
-}
-
-.feature-card {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 30px 20px;
-  border-radius: 15px;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  transition: all 0.3s ease;
-}
-
-.feature-card:hover {
-  transform: translateY(-5px);
-  background: rgba(255, 255, 255, 0.15);
-}
-
-.feature-icon {
-  font-size: 3rem;
-  margin-bottom: 15px;
-}
-
-.feature-card h3 {
-  font-size: 1.3rem;
-  margin-bottom: 10px;
-  font-weight: bold;
-}
-
-.feature-card p {
-  opacity: 0.9;
-  line-height: 1.5;
-}
-
-.hero-actions {
-  display: flex;
-  gap: 20px;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.cta-button {
-  padding: 15px 30px;
-  border-radius: 25px;
-  text-decoration: none;
-  font-weight: bold;
   font-size: 1.1rem;
-  transition: all 0.3s ease;
-  display: inline-block;
-  min-width: 150px;
-  text-align: center;
+  margin-bottom: 24px;
+  color: var(--text-secondary);
+  max-width: 800px;
+  margin-left: 0;
+  /* Left align */
+  opacity: 1;
 }
 
-.cta-button.primary {
-  background: linear-gradient(135deg, #27ae60, #2ecc71);
+/* Dashboard Layout */
+.hero-actions.dashboard-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-top: 32px;
+  width: 100%;
+  max-width: 1000px;
+}
+
+/* Primary Action Group */
+.action-group.primary {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.cta-button.primary-large {
+  background: var(--accent-color);
   color: white;
-  box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
+  border: none;
+  padding: 16px 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 0 4px 6px rgba(52, 152, 219, 0.2);
+  transition: all 0.2s ease;
+  width: 100%;
+  text-align: left;
 }
 
-.cta-button.primary:hover {
+.cta-button.primary-large:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(39, 174, 96, 0.4);
+  box-shadow: 0 6px 12px rgba(52, 152, 219, 0.3);
+  background: var(--accent-hover);
 }
 
-.cta-button.secondary {
-  background: transparent;
-  color: white;
-  border: 2px solid white;
+.icon-container-primary {
+  background: rgba(255, 255, 255, 0.2);
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.cta-button.secondary:hover {
+.material-icon {
+  font-size: 1.5rem;
+  font-weight: 300;
+}
+
+.btn-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.btn-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.btn-desc {
+  font-size: 0.9rem;
+  opacity: 0.9;
+  font-weight: 400;
+}
+
+/* Modules Grid */
+.action-group.modules {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.module-card {
   background: white;
-  color: #667eea;
-  transform: translateY(-2px);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 20px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: row;
+  /* Left aligned layout */
+  align-items: center;
+  text-align: left;
+  gap: 16px;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
 }
 
+.module-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-color);
+  box-shadow: var(--shadow-md);
+}
+
+.module-icon-container {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+
+.hrs-theme {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.lab-theme {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.logistics-theme {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.history-theme {
+  background-color: #f8f9fa;
+}
+
+.history-icon {
+  background: #eceff1;
+  color: #546e7a;
+}
+
+.module-content h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.module-content p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* Remove old secondary styles if unused */
+.action-group.secondary {
+  display: none;
+}
+
+/* Quick Links / Services Section */
 .home-services {
-  padding: 80px 20px;
-  background: rgba(255, 255, 255, 0.05);
+  padding: 0 32px;
+  background: transparent;
 }
 
 .services-content {
   max-width: 1200px;
   margin: 0 auto;
-  text-align: center;
+  text-align: left;
 }
 
 .services-content h2 {
-  font-size: 2.5rem;
-  margin-bottom: 50px;
-  font-weight: bold;
+  font-size: 1.5rem;
+  margin-bottom: 24px;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 12px;
 }
 
 .services-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 30px;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 24px;
 }
 
 .service-card {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 30px 25px;
-  border-radius: 15px;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  transition: all 0.3s ease;
+  background: white;
+  padding: 24px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
 }
 
 .service-card:hover {
-  transform: translateY(-5px);
-  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+  background: white;
+  border-color: var(--accent-color);
+  box-shadow: var(--shadow-md);
 }
 
 .service-card h3 {
-  font-size: 1.4rem;
-  margin-bottom: 15px;
-  font-weight: bold;
+  font-size: 1.1rem;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .service-card p {
-  opacity: 0.9;
-  line-height: 1.6;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  opacity: 1;
 }
 
+/* "Why Choose" -> System Status or Info */
 .home-why-choose {
-  padding: 80px 20px;
-  background: rgba(255, 255, 255, 0.05);
+  padding: 40px 32px;
+  background: transparent;
 }
 
 .why-choose-content {
   max-width: 1200px;
   margin: 0 auto;
-  text-align: center;
+  text-align: left;
 }
 
 .why-choose-content h2 {
-  font-size: 2.5rem;
-  margin-bottom: 50px;
-  font-weight: bold;
+  font-size: 1.5rem;
+  margin-bottom: 24px;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 12px;
 }
 
 .why-choose-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 25px;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
 }
 
 .why-item {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 25px 20px;
-  border-radius: 15px;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  text-align: left;
+  background: white;
+  padding: 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  align-items: flex-start;
+  gap: 12px;
 }
 
 .why-item:hover {
-  transform: translateY(-3px);
-  background: rgba(255, 255, 255, 0.15);
+  transform: none;
+  background: white;
 }
 
 .why-icon {
-  font-size: 1.5rem;
-  color: #2ecc71;
-  font-weight: bold;
-  min-width: 30px;
+  font-size: 1.25rem;
+  color: var(--success-color);
+  min-width: 24px;
+  margin-top: 2px;
 }
 
 .why-item h4 {
-  font-size: 1.1rem;
+  font-size: 1rem;
   margin: 0;
   font-weight: 500;
-  line-height: 1.4;
+  color: var(--text-primary);
 }
 
+/* Footer - Simple & functional */
 .home-footer {
-  padding: 60px 20px;
+  padding: 24px 32px;
   text-align: center;
-  background: rgba(0, 0, 0, 0.2);
+  background: transparent;
+  border-top: 1px solid var(--border-color);
+  margin-top: 40px;
 }
 
-.footer-content {
-  max-width: 800px;
-  margin: 0 auto;
+.footer-content h3,
+.footer-content p {
+  display: block;
+  /* Show footer text for better UX */
+  margin-bottom: 16px;
 }
 
 .footer-content h3 {
-  font-size: 2rem;
-  margin-bottom: 20px;
-  font-weight: bold;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
 }
 
 .footer-content p {
-  font-size: 1.1rem;
-  margin-bottom: 30px;
-  opacity: 0.9;
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
 }
 
 .footer-info {
-  margin-top: 40px;
-  padding-top: 30px;
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
 }
 
 .footer-company {
-  font-size: 0.95rem;
-  opacity: 0.85;
-  line-height: 1.6;
-  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
 }
 
-/* Responsive Design */
+/* Responsive */
 @media (max-width: 768px) {
+
+  .home-hero,
+  .home-services,
+  .home-why-choose {
+    padding: 24px 16px;
+  }
+
   .hero-content h1 {
-    font-size: 2.5rem;
-  }
-  
-  .hero-subtitle {
-    font-size: 1.1rem;
-  }
-  
-  .hero-features {
-    grid-template-columns: 1fr;
-    gap: 20px;
-  }
-  
-  .hero-actions {
-    flex-direction: column;
-    align-items: center;
-  }
-  
-  .cta-button {
-    width: 100%;
-    max-width: 250px;
-  }
-  
-  .services-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .services-content h2 {
-    font-size: 2rem;
-  }
-  
-  .why-choose-content h2 {
-    font-size: 2rem;
-  }
-  
-  .why-choose-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .why-item {
-    flex-direction: column;
-    text-align: center;
+    font-size: 1.75rem;
   }
 }

@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
 
-const DrivingSection = ({ 
-  roundtripData, 
-  setRoundtripData, 
-  dailyData, 
+const DrivingSection = ({
+  roundtripData,
+  setRoundtripData,
+  dailyData,
   setDailyData,
   siteAccessMode,
-  isExpanded, 
-  onToggle 
+  isExpanded,
+  onToggle
 }) => {
   const [locationType, setLocationType] = useState(''); // 'anchorage' or 'other'
   const [otherLocation, setOtherLocation] = useState('');
-  
+
   // Initialize location type based on existing data
   useEffect(() => {
     if (roundtripData?.project_location) {
@@ -25,35 +25,35 @@ const DrivingSection = ({
       }
     }
   }, [roundtripData?.project_location]);
-  
+
   const handleLocationTypeChange = (type) => {
     setLocationType(type);
     if (type === 'anchorage') {
       setOtherLocation('');
-      setRoundtripData({ 
-        ...roundtripData, 
+      setRoundtripData({
+        ...roundtripData,
         project_location: 'Anchorage',
         project_duration_days: roundtripData.project_duration_days || 1,
         anchorage_flat_fee: roundtripData.anchorage_flat_fee || 45
       });
     } else {
-      setRoundtripData({ 
-        ...roundtripData, 
+      setRoundtripData({
+        ...roundtripData,
         project_location: otherLocation || '',
         anchorage_flat_fee: null
       });
     }
   };
-  
+
   const handleOtherLocationChange = (value) => {
     setOtherLocation(value);
     setRoundtripData({ ...roundtripData, project_location: value });
   };
-  
+
   const isAnchorage = locationType === 'anchorage' || roundtripData?.project_location?.toLowerCase() === 'anchorage';
-  const isDailyAnchorage = dailyData?.site_location?.toLowerCase() === 'anchorage' || 
-                           dailyData?.lodging_location?.toLowerCase() === 'anchorage';
-  
+  const isDailyAnchorage = dailyData?.site_location?.toLowerCase() === 'anchorage' ||
+    dailyData?.lodging_location?.toLowerCase() === 'anchorage';
+
   // Calculate auto-calc display values (display only, don't overwrite user input)
   const calculateRoundtripAutoTime = () => {
     const miles = parseFloat(roundtripData?.one_way_miles) || 0;
@@ -62,7 +62,7 @@ const DrivingSection = ({
     }
     return '0.00';
   };
-  
+
   const calculateDailyAutoTime = () => {
     const miles = parseFloat(dailyData?.daily_miles) || 0;
     if (miles > 0) {
@@ -70,7 +70,7 @@ const DrivingSection = ({
     }
     return '0.00';
   };
-  
+
   // Pre-fill site location from roundtrip project location
   useEffect(() => {
     if (roundtripData?.project_location && !dailyData?.site_location && locationType === 'other') {
@@ -78,17 +78,17 @@ const DrivingSection = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundtripData?.project_location, locationType]);
-  
+
   // If roundtripData is null/undefined, don't show roundtrip section
   const showRoundtrip = siteAccessMode === 'driving' && roundtripData;
 
   return (
     <div className="collapsible-section">
-      <div 
+      <div
         className="section-header clickable"
         onClick={onToggle}
       >
-        <h2>Driving</h2>
+        <h2>🚗 Driving</h2>
         <span className="toggle-icon">{isExpanded ? '▼' : '▶'}</span>
       </div>
       {isExpanded && (
@@ -179,7 +179,7 @@ const DrivingSection = ({
                     />
                   </div>
                 </div>
-                
+
                 {isAnchorage ? (
                   <div className="input-row">
                     <div className="input-group">
@@ -313,7 +313,7 @@ const DrivingSection = ({
                   />
                 </div>
               </div>
-              
+
               {isDailyAnchorage ? (
                 <div className="input-row">
                   <div className="input-group">

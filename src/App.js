@@ -1,7 +1,10 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { initializeSession } from './utils/sessionManager';
+import { ProjectProvider } from './contexts/ProjectContext';
+import ProtectedRoute from './components/ProtectedRoute';
 import Home from './components/Home';
+import SelectProject from './components/SelectProject';
 import LabTests from './components/LabTests';
 import HRSEstimator from './components/HRSEstimator';
 import EstimationsList from './components/EstimationsList';
@@ -20,19 +23,55 @@ function App() {
 
   return (
     <Router>
-      <div className="App">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/lab-fees" element={<LabTests />} />
-          <Route path="/hrs-estimator" element={<HRSEstimator />} />
-          <Route path="/hrs-estimator/list" element={<EstimationsList />} />
-          <Route path="/logistics" element={<Logistics />} />
-          <Route path="/logistics/list" element={<LogisticsEstimationsList />} />
-          <Route path="/project-summary" element={<ProjectEstimateSummary />} />
-          <Route path="/previous-estimates" element={<PreviousEstimates />} />
-          <Route path="/snapshots/:snapshotId/details" element={<SnapshotDetails />} />
-        </Routes>
-      </div>
+      <ProjectProvider>
+        <div className="App">
+          <Routes>
+            {/* Home page - always accessible, no project required */}
+            <Route path="/" element={<Home />} />
+            <Route path="/select-project" element={<SelectProject />} />
+            {/* Protected routes - require project context */}
+            <Route
+              path="/lab-fees"
+              element={
+                <ProtectedRoute>
+                  <LabTests />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hrs-estimator"
+              element={
+                <ProtectedRoute>
+                  <HRSEstimator />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/hrs-estimator/list" element={<EstimationsList />} />
+            <Route
+              path="/logistics"
+              element={
+                <ProtectedRoute>
+                  <Logistics />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/logistics/list" element={<LogisticsEstimationsList />} />
+            <Route
+              path="/project-summary"
+              element={
+                <ProtectedRoute>
+                  <ProjectEstimateSummary />
+                </ProtectedRoute>
+              }
+            />
+            {/* Public routes - no project context required */}
+            <Route path="/previous-estimates" element={<PreviousEstimates />} />
+            <Route path="/snapshots/:snapshotId/details" element={<SnapshotDetails />} />
+            {/* Catch-all route - redirect unknown paths to Home */}
+            <Route path="*" element={<Home />} />
+          </Routes>
+        </div>
+      </ProjectProvider>
     </Router>
   );
 }
