@@ -66,15 +66,15 @@ export const labFeesAPI = {
   getLabFees: async (labId) => {
     try {
       console.log('Making API request for lab:', labId);
-      
+
       // Get categories for the lab
       const categories = await labFeesAPI.getCategories(labId);
-      
+
       // For each category, get tests and their rates
       const categoriesWithTests = await Promise.all(
         categories.map(async (category) => {
           const tests = await labFeesAPI.getTests(category.id);
-          
+
           // For each test, get rates
           const testsWithRates = await Promise.all(
             tests.map(async (test) => {
@@ -89,14 +89,14 @@ export const labFeesAPI = {
               };
             })
           );
-          
+
           return {
             ...category,
             tests: testsWithRates
           };
         })
       );
-      
+
       return {
         categories: categoriesWithTests
       };
@@ -137,6 +137,19 @@ export const labFeesAPI = {
     }
   },
 
+  // Delete category
+  deleteCategory: async (categoryId) => {
+    try {
+      console.log('Deleting category:', categoryId);
+      const response = await api.delete(`/lab-fees/categories/${categoryId}`);
+      console.log('Delete category response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      throw error;
+    }
+  },
+
   // Create new test
   createTest: async (testData, categoryId) => {
     try {
@@ -149,6 +162,46 @@ export const labFeesAPI = {
       return response.data;
     } catch (error) {
       console.error('Error creating test:', error);
+      console.error('Error response:', error.response);
+      throw error;
+    }
+  },
+
+  // Delete test
+  deleteTest: async (testId) => {
+    try {
+      console.log('Deleting test:', testId);
+      const response = await api.delete(`/lab-fees/tests/${testId}`);
+      console.log('Delete test response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting test:', error);
+      throw error;
+    }
+  },
+
+  // Get turnaround times
+  getTurnTimes: async () => {
+    try {
+      console.log('Fetching turnaround times');
+      const response = await api.get('/lab-fees/turn_times/');
+      console.log('Get turn times response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching turn times:', error);
+      throw error;
+    }
+  },
+
+  // Create new rate
+  createRate: async (rateData) => {
+    try {
+      console.log('Creating rate:', rateData);
+      const response = await api.post('/lab-fees/rates/', rateData);
+      console.log('Create rate response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating rate:', error);
       console.error('Error response:', error.response);
       throw error;
     }
@@ -187,7 +240,7 @@ export const labFeesAPI = {
       const params = new URLSearchParams();
       if (projectName) params.append('project_name', projectName);
       if (hrsEstimationId) params.append('hrs_estimation_id', hrsEstimationId);
-      
+
       const url = `/lab-fees/orders/${params.toString() ? '?' + params.toString() : ''}`;
       const response = await api.get(url);
       return response.data;

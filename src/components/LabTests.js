@@ -72,6 +72,7 @@ const LabTests = () => {
   const [newCategory, setNewCategory] = useState({ name: '', description: '' });
   const [newTest, setNewTest] = useState({ name: '', description: '', category: '', pricing: [] });
   const [currentTestPricing, setCurrentTestPricing] = useState([]);
+  const [turnTimes, setTurnTimes] = useState([]);
 
   // Staff assignments state
   const [laborRates, setLaborRates] = useState([]);
@@ -445,17 +446,21 @@ const LabTests = () => {
   useEffect(() => {
     fetchLabs();
 
-    // Fetch labor rates on mount - exactly like HRS Estimator
-    const fetchLaborRates = async () => {
+    // Fetch labor rates and turn times on mount
+    const fetchReferenceData = async () => {
       try {
         const rates = await labFeesAPI.getLaborRates();
         console.log('Labor rates fetched:', rates);
         setLaborRates(rates);
+
+        const turnTimesData = await labFeesAPI.getTurnTimes();
+        console.log('Turn times fetched:', turnTimesData);
+        setTurnTimes(turnTimesData);
       } catch (err) {
-        console.error('Error fetching labor rates:', err);
+        console.error('Error fetching reference data:', err);
       }
     };
-    fetchLaborRates();
+    fetchReferenceData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -848,6 +853,39 @@ const LabTests = () => {
     }
   };
 
+  // Delete Category Handler
+  const handleDeleteCategory = async (categoryId) => {
+    if (window.confirm('Are you sure you want to delete this category? This will permanently delete all tests and rates within it.')) {
+      try {
+        await labFeesAPI.deleteCategory(categoryId);
+        // If the deleted category was selected, clear selection
+        if (selectedCategory?.id === categoryId) {
+          setSelectedCategory(null);
+          setSelectedTest(null);
+        }
+        await fetchCategoriesForLab(selectedLab.id);
+      } catch (error) {
+        alert('Error deleting category: ' + (error.response?.data?.detail || error.message));
+      }
+    }
+  };
+
+  // Delete Test Handler
+  const handleDeleteTest = async (testId) => {
+    if (window.confirm('Are you sure you want to delete this test? This will permanently delete all associated rates.')) {
+      try {
+        await labFeesAPI.deleteTest(testId);
+        // If the deleted test was selected, clear selection
+        if (selectedTest?.id === testId) {
+          setSelectedTest(null);
+        }
+        await fetchCategoriesForLab(selectedLab.id);
+      } catch (error) {
+        alert('Error deleting test: ' + (error.response?.data?.detail || error.message));
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="loading-container">
@@ -1048,7 +1086,26 @@ const LabTests = () => {
                 className={`category-item ${selectedCategory?.id === category.id ? 'active' : ''}`}
                 onClick={() => handleCategoryChange(category)}
               >
-                <div className="category-name">{category.name}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div className="category-name">{category.name}</div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteCategory(category.id);
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#e74c3c',
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                      padding: '0 5px'
+                    }}
+                    title="Delete Category"
+                  >
+                    🗑️
+                  </button>
+                </div>
                 <div className="category-description">{category.description}</div>
                 <div className="test-count">
                   {category.tests ? category.tests.length : 0} tests
@@ -1088,7 +1145,26 @@ const LabTests = () => {
                         }`}
                       onClick={() => setSelectedTest(test)}
                     >
-                      <h4>{test.name}</h4>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <h4>{test.name}</h4>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTest(test.id);
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#e74c3c',
+                            cursor: 'pointer',
+                            fontSize: '1rem',
+                            padding: '0 5px'
+                          }}
+                          title="Delete Test"
+                        >
+                          🗑️
+                        </button>
+                      </div>
                       <div className="test-rates-preview">
                         {test.rates && test.rates.length > 0 && (
                           <>
@@ -1738,16 +1814,35 @@ const LabTests = () => {
             <form onSubmit={async (e) => {
               e.preventDefault();
               try {
+                // 1. Create the test first
                 const testData = {
                   name: newTest.name,
                   description: newTest.description
                 };
-                await labFeesAPI.createTest(testData, selectedCategory.id);
+                const createdTest = await labFeesAPI.createTest(testData, selectedCategory.id);
+
+                // 2. Create rates for each pricing entry
+                if (currentTestPricing.length > 0) {
+                  await Promise.all(currentTestPricing.map(pricing => {
+                    // Turn time might be an object or ID depending on how it's handled
+                    // But in this form we will ensure it is the ID from the select
+                    if (!pricing.turn_time_id || !pricing.price) return Promise.resolve();
+
+                    const rateData = {
+                      test_id: createdTest.id,
+                      turn_time_id: parseInt(pricing.turn_time_id),
+                      lab_id: selectedLab.id,
+                      price: parseFloat(pricing.price)
+                    };
+                    return labFeesAPI.createRate(rateData);
+                  }));
+                }
+
                 await fetchCategoriesForLab(selectedLab.id); // Refresh the categories and tests
                 setShowAddTestModal(false);
                 setNewTest({ name: '', description: '', category: '', pricing: [] });
                 setCurrentTestPricing([]);
-                alert('Test created successfully!');
+                alert('Test and rates created successfully!');
               } catch (error) {
                 alert('Error creating test: ' + (error.response?.data?.detail || error.message));
               }
@@ -1778,7 +1873,7 @@ const LabTests = () => {
                 <input
                   id="test-category"
                   type="text"
-                  value={newTest.category}
+                  value={selectedCategory ? selectedCategory.name : ''}
                   readOnly
                   className="readonly-input"
                 />
@@ -1790,17 +1885,21 @@ const LabTests = () => {
                 <div className="pricing-inputs">
                   {currentTestPricing.map((pricing, index) => (
                     <div key={index} className="pricing-row-input">
-                      <input
-                        type="text"
-                        placeholder="Turnaround Time (e.g., 24 hr, 48 hr)"
-                        value={pricing.turn_time}
+                      <select
+                        value={pricing.turn_time_id}
                         onChange={(e) => {
                           const newPricing = [...currentTestPricing];
-                          newPricing[index].turn_time = e.target.value;
+                          newPricing[index].turn_time_id = e.target.value;
                           setCurrentTestPricing(newPricing);
                         }}
                         className="turn-time-input"
-                      />
+                        required
+                      >
+                        <option value="">Select Turnaround Time</option>
+                        {turnTimes.map(tt => (
+                          <option key={tt.id} value={tt.id}>{tt.label} ({tt.hours} hr)</option>
+                        ))}
+                      </select>
                       <input
                         type="number"
                         step="0.01"
@@ -1808,10 +1907,13 @@ const LabTests = () => {
                         value={pricing.price}
                         onChange={(e) => {
                           const newPricing = [...currentTestPricing];
-                          newPricing[index].price = parseFloat(e.target.value) || 0;
+                          // Allow empty string for better UX, convert to float only if valid number
+                          const val = e.target.value;
+                          newPricing[index].price = val === '' ? '' : parseFloat(val);
                           setCurrentTestPricing(newPricing);
                         }}
                         className="price-input"
+                        required
                       />
                       <button
                         type="button"
@@ -1827,7 +1929,7 @@ const LabTests = () => {
                   ))}
                   <button
                     type="button"
-                    onClick={() => setCurrentTestPricing([...currentTestPricing, { turn_time: '', price: 0 }])}
+                    onClick={() => setCurrentTestPricing([...currentTestPricing, { turn_time_id: '', price: '' }])}
                     className="add-pricing-btn"
                   >
                     ➕ Add Pricing
