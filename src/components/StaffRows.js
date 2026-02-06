@@ -1,6 +1,10 @@
 import React from 'react';
 
 const StaffRows = ({ staffRows, setStaffRows, laborRates, totalStaffCount, fieldStaffCount }) => {
+  // Get user role from localStorage
+  const userRole = localStorage.getItem('user_role') || 'user';
+  const canSeeRates = userRole === 'admin';
+
   const handleAddRow = () => {
     setStaffRows([...staffRows, { role: '', count: 0 }]);
   };
@@ -27,6 +31,14 @@ const StaffRows = ({ staffRows, setStaffRows, laborRates, totalStaffCount, field
     return rateEntry ? rateEntry.hourly_rate : null;
   };
 
+  // Format dropdown option text based on role visibility
+  const formatRoleOption = (rateEntry) => {
+    if (canSeeRates) {
+      return `${rateEntry.labor_role} ($${rateEntry.hourly_rate.toFixed(2)}/hr)`;
+    }
+    return rateEntry.labor_role; // Hide rate for non-admins
+  };
+
   return (
     <div className="staff-rows-section">
       <div className="staff-rows-header">
@@ -40,7 +52,7 @@ const StaffRows = ({ staffRows, setStaffRows, laborRates, totalStaffCount, field
         <div className="staff-rows-header-row">
           <div className="staff-role-header">Role</div>
           <div className="staff-count-header">Count</div>
-          <div className="staff-rate-header">Hourly Rate</div>
+          {canSeeRates && <div className="staff-rate-header">Hourly Rate</div>}
           <div className="staff-remove-header"></div>
         </div>
 
@@ -59,7 +71,7 @@ const StaffRows = ({ staffRows, setStaffRows, laborRates, totalStaffCount, field
                   <option value="">-- Select Role --</option>
                   {laborRates.map((rateEntry) => (
                     <option key={rateEntry.labor_role} value={rateEntry.labor_role}>
-                      {rateEntry.labor_role} (${rateEntry.hourly_rate.toFixed(2)}/hr)
+                      {formatRoleOption(rateEntry)}
                     </option>
                   ))}
                 </select>
@@ -80,13 +92,15 @@ const StaffRows = ({ staffRows, setStaffRows, laborRates, totalStaffCount, field
                   placeholder="1"
                 />
               </div>
-              <div className="staff-rate-cell">
-                {hasRate ? (
-                  <span className="rate-display">${rate.toFixed(2)}/hr</span>
-                ) : (
-                  <span className="rate-display no-rate">N/A</span>
-                )}
-              </div>
+              {canSeeRates && (
+                <div className="staff-rate-cell">
+                  {hasRate ? (
+                    <span className="rate-display">${rate.toFixed(2)}/hr</span>
+                  ) : (
+                    <span className="rate-display no-rate">N/A</span>
+                  )}
+                </div>
+              )}
               <div className="staff-remove-cell">
                 {row.role && (
                   <button
@@ -132,4 +146,3 @@ const StaffRows = ({ staffRows, setStaffRows, laborRates, totalStaffCount, field
 };
 
 export default StaffRows;
-

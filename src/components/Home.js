@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProject } from '../contexts/ProjectContext';
+import { authAPI } from '../services/api';
 import './Home.css';
 
 const Home = () => {
@@ -25,6 +26,21 @@ const Home = () => {
           <p className="hero-subtitle">
             Internal Enterprise Resource Planning System
           </p>
+
+          {/* User Info & Logout */}
+          <div className="user-info-bar">
+            <span className="user-email">{localStorage.getItem('user_email') || 'User'}</span>
+            <span className="user-role-badge">{localStorage.getItem('user_role') || 'user'}</span>
+            <button
+              onClick={() => {
+                authAPI.logout();
+                navigate('/login', { replace: true });
+              }}
+              className="logout-button"
+            >
+              Sign Out
+            </button>
+          </div>
 
           {/* Dashboard Actions - Replaces Marketing Features */}
           <div className="hero-actions dashboard-grid">
@@ -97,6 +113,22 @@ const Home = () => {
                   <p>View project history</p>
                 </div>
               </button>
+
+              {/* Admin Dashboard - Only visible to admins */}
+              {localStorage.getItem('user_role') === 'admin' && (
+                <button
+                  onClick={() => navigate('/admin')}
+                  className="module-card admin-theme"
+                >
+                  <div className="module-icon-container admin-icon">
+                    <span className="module-initial">⚙</span>
+                  </div>
+                  <div className="module-content">
+                    <h3>Admin Dashboard</h3>
+                    <p>Manage users & roles</p>
+                  </div>
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -21,6 +21,10 @@ const HRSEstimator = () => {
   const [laborRates, setLaborRates] = useState([]);
   const [showBreakdown, setShowBreakdown] = useState(false);
 
+  // Role-based access control
+  const userRole = localStorage.getItem('user_role') || 'user';
+  const canSeeRates = userRole === 'admin';
+
   // Staff rows (multiple roles support)
   const [staffRows, setStaffRows] = useState([{ role: '', count: 0 }]);
 
@@ -921,7 +925,7 @@ const HRSEstimator = () => {
               <div className="section-content">
                 <div className="input-grid">
                   <div className="input-group">
-                    <label>Program Manager Hours (${laborRates.find(r => r.labor_role === 'Program Manager')?.hourly_rate?.toFixed(2) || '131.55'}/hr)</label>
+                    <label>Program Manager Hours{canSeeRates ? ` ($${laborRates.find(r => r.labor_role === 'Program Manager')?.hourly_rate?.toFixed(2) || '131.55'}/hr)` : ''}</label>
                     <input
                       type="number"
                       min="0"
@@ -941,7 +945,7 @@ const HRSEstimator = () => {
                     />
                   </div>
                   <div className="input-group">
-                    <label>Project Manager Hours (${laborRates.find(r => r.labor_role === 'Project Manager')?.hourly_rate?.toFixed(2) || '104.23'}/hr)</label>
+                    <label>Project Manager Hours{canSeeRates ? ` ($${laborRates.find(r => r.labor_role === 'Project Manager')?.hourly_rate?.toFixed(2) || '104.23'}/hr)` : ''}</label>
                     <input
                       type="number"
                       min="0"
@@ -961,7 +965,7 @@ const HRSEstimator = () => {
                     />
                   </div>
                   <div className="input-group">
-                    <label>Accounting Hours (${laborRates.find(r => r.labor_role === 'Accounting')?.hourly_rate?.toFixed(2) || '95.36'}/hr)</label>
+                    <label>Accounting Hours{canSeeRates ? ` ($${laborRates.find(r => r.labor_role === 'Accounting')?.hourly_rate?.toFixed(2) || '95.36'}/hr)` : ''}</label>
                     <input
                       type="number"
                       min="0"
@@ -981,7 +985,7 @@ const HRSEstimator = () => {
                     />
                   </div>
                   <div className="input-group">
-                    <label>Administrative Hours (${laborRates.find(r => r.labor_role === 'Administrative')?.hourly_rate?.toFixed(2) || '54.80'}/hr)</label>
+                    <label>Administrative Hours{canSeeRates ? ` ($${laborRates.find(r => r.labor_role === 'Administrative')?.hourly_rate?.toFixed(2) || '54.80'}/hr)` : ''}</label>
                     <input
                       type="number"
                       min="0"
@@ -1118,8 +1122,8 @@ const HRSEstimator = () => {
                       <th>Role</th>
                       <th className="text-center">Count</th>
                       <th className="text-right">Hours</th>
-                      <th className="text-right">Rate</th>
-                      <th className="text-right">Cost</th>
+                      {canSeeRates && <th className="text-right">Rate</th>}
+                      {canSeeRates && <th className="text-right">Cost</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -1136,12 +1140,16 @@ const HRSEstimator = () => {
                           <td>{role}</td>
                           <td className="text-center">{count}</td>
                           <td className="text-right">{hours > 0 ? hours.toFixed(2) : 'N/A'}</td>
-                          <td className="text-right">
-                            {rate ? `$${rate.toFixed(2)}/hr` : 'N/A'}
-                          </td>
-                          <td className="text-right">
-                            ${cost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </td>
+                          {canSeeRates && (
+                            <td className="text-right">
+                              {rate ? `$${rate.toFixed(2)}/hr` : 'N/A'}
+                            </td>
+                          )}
+                          {canSeeRates && (
+                            <td className="text-right">
+                              ${cost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -1256,26 +1264,28 @@ const HRSEstimator = () => {
               </div>
             )}
 
-            {/* Calculation Breakdown Toggle */}
-            <div style={{ marginTop: '30px', textAlign: 'center' }}>
-              <button
-                className={`show-breakdown-btn ${showBreakdown ? 'active' : ''}`}
-                onClick={() => setShowBreakdown(!showBreakdown)}
-                style={{
-                  padding: '12px 24px',
-                  background: showBreakdown ? '#3498db' : '#95a5a6',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '1rem',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                {showBreakdown ? '▼ Hide Detailed Breakdown' : '▶ Show Detailed Breakdown'}
-              </button>
-            </div>
+            {/* Calculation Breakdown Toggle - Only for Admin/Manager */}
+            {(userRole === 'admin' || userRole === 'manager') && (
+              <div style={{ marginTop: '30px', textAlign: 'center' }}>
+                <button
+                  className={`show-breakdown-btn ${showBreakdown ? 'active' : ''}`}
+                  onClick={() => setShowBreakdown(!showBreakdown)}
+                  style={{
+                    padding: '12px 24px',
+                    background: showBreakdown ? '#3498db' : '#95a5a6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '1rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  {showBreakdown ? '▼ Hide Detailed Breakdown' : '▶ Show Detailed Breakdown'}
+                </button>
+              </div>
+            )}
 
             {/* Detailed Calculation Breakdown */}
             {showBreakdown && (

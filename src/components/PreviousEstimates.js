@@ -321,6 +321,44 @@ const PreviousEstimates = () => {
                           >
                             View Details
                           </button>
+                          {snapshot.is_active && (
+                            <button
+                              className="btn-resume"
+                              onClick={async () => {
+                                try {
+                                  // Set project context
+                                  let projectData;
+                                  try {
+                                    projectData = await projectAPI.getProjectByName(project.project_name);
+                                  } catch (err) {
+                                    projectData = await projectAPI.createProject({
+                                      name: project.project_name,
+                                      address: 'Address not specified'
+                                    });
+                                  }
+                                  setCurrentProject(projectData);
+                                  await new Promise(resolve => setTimeout(resolve, 100));
+                                  // Navigate to project summary where they can access all modules
+                                  navigate('/project-summary', { replace: true });
+                                } catch (err) {
+                                  console.error('Error resuming estimate:', err);
+                                  alert('Failed to resume estimate. Please try again.');
+                                }
+                              }}
+                              style={{
+                                background: 'linear-gradient(135deg, #27ae60, #2ecc71)',
+                                color: 'white',
+                                border: 'none',
+                                padding: '10px 16px',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontWeight: '600',
+                                fontSize: '0.9rem'
+                              }}
+                            >
+                              ✏️ Resume Editing
+                            </button>
+                          )}
                           {!snapshot.is_active && (
                             <button
                               className="btn-open"

@@ -89,7 +89,7 @@ const LogisticsResultsCard = ({ result }) => {
           </table>
         </div>
       )}
-      
+
       {/* Driving Totals */}
       {(result.total_driving_cost > 0 || result.total_driving_miles > 0) && (
         <div className="category-breakdown">
@@ -270,15 +270,17 @@ const LogisticsResultsCard = ({ result }) => {
         </div>
       )}
 
-      {/* Calculation Breakdown Toggle */}
-      <div style={{ marginTop: '30px', textAlign: 'center' }}>
-        <button
-          className={`show-breakdown-btn ${showBreakdown ? 'active' : ''}`}
-          onClick={() => setShowBreakdown(!showBreakdown)}
-        >
-          {showBreakdown ? '▼ Hide Calculation Breakdown' : '▶ Show Calculation Breakdown'}
-        </button>
-      </div>
+      {/* Calculation Breakdown Toggle - Only for Admin/Manager */}
+      {(localStorage.getItem('user_role') === 'admin' || localStorage.getItem('user_role') === 'manager') && (
+        <div style={{ marginTop: '30px', textAlign: 'center' }}>
+          <button
+            className={`show-breakdown-btn ${showBreakdown ? 'active' : ''}`}
+            onClick={() => setShowBreakdown(!showBreakdown)}
+          >
+            {showBreakdown ? '▼ Hide Calculation Breakdown' : '▶ Show Calculation Breakdown'}
+          </button>
+        </div>
+      )}
 
       {/* Detailed Calculation Breakdown */}
       {showBreakdown && (

@@ -570,4 +570,78 @@ export const estimateSnapshotAPI = {
   },
 };
 
+// User Management API (Admin only)
+export const userManagementAPI = {
+  // Get all users
+  listUsers: async (token) => {
+    try {
+      const response = await api.get('/users/', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error listing users:', error);
+      throw error;
+    }
+  },
+
+  // Create new user
+  createUser: async (userData, token) => {
+    try {
+      const response = await api.post('/users/', userData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error creating user:', error);
+      throw error;
+    }
+  },
+
+  // Delete user
+  deleteUser: async (userId, token) => {
+    try {
+      const response = await api.delete(`/users/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      throw error;
+    }
+  },
+};
+
+// Authentication API
+export const authAPI = {
+  // Sign in
+  signin: async ({ email, password }) => {
+    try {
+      // Backend expects JSON body with email and password
+      const response = await api.post('/auth/signin', { email, password });
+      return response.data;
+    } catch (error) {
+      console.error('Error signing in:', error);
+      throw error;
+    }
+  },
+
+  // Log out (clears local storage)
+  logout: () => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user_role');
+    localStorage.removeItem('user_email');
+  },
+
+  // Check if authenticated
+  isAuthenticated: () => {
+    return !!localStorage.getItem('access_token');
+  },
+
+  // Get current user role
+  getRole: () => {
+    return localStorage.getItem('user_role') || 'user';
+  }
+};
+
 export default api;
