@@ -906,15 +906,15 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: var(--bg-primary, #f5f6fa);
+  color: var(--text-primary, #2c3e50);
 }
 
 .loading-spinner {
   width: 50px;
   height: 50px;
-  border: 5px solid rgba(255, 255, 255, 0.3);
-  border-top: 5px solid white;
+  border: 5px solid rgba(52, 152, 219, 0.2);
+  border-top: 5px solid var(--accent-color, #3498db);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-bottom: 20px;
