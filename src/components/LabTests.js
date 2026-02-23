@@ -68,6 +68,8 @@ const LabTests = () => {
   const [quantities, setQuantities] = useState({}); // Track quantities for each test
   const [selectedTurnTime, setSelectedTurnTime] = useState(null); // Track selected turnaround time
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
+  const [showAddLabModal, setShowAddLabModal] = useState(false);
+  const [newLab, setNewLab] = useState({ name: '', address: '', contact_info: '' });
   const [showAddTestModal, setShowAddTestModal] = useState(false);
   const [newCategory, setNewCategory] = useState({ name: '', description: '' });
   const [newTest, setNewTest] = useState({ name: '', description: '', category: '', pricing: [] });
@@ -92,7 +94,74 @@ const LabTests = () => {
   // Breakdown display state
   const [showBreakdown, setShowBreakdown] = useState(false);
 
-  // Project context is managed by ProjectProvider - no need for localStorage
+  // Cross-lab cart state
+  // Each item: { id, labId, labName, testId, testName, categoryName, turnTime, turnTimeHours, price, quantity }
+  const [cart, setCart] = useState([]);
+
+  // Add test to cart (or increment if already exists)
+  const addToCart = (test, rate, category) => {
+    const turnTimeStr = typeof rate.turn_time === 'string' ? rate.turn_time : rate.turn_time?.label || 'unknown';
+    const existingIndex = cart.findIndex(
+      item => item.testId === test.id && item.turnTime === turnTimeStr && item.labId === selectedLab?.id
+    );
+
+    if (existingIndex >= 0) {
+      // Increment quantity
+      const updated = [...cart];
+      updated[existingIndex] = { ...updated[existingIndex], quantity: updated[existingIndex].quantity + 1 };
+      setCart(updated);
+    } else {
+      setCart([...cart, {
+        id: `${selectedLab?.id}-${test.id}-${turnTimeStr}-${Date.now()}`,
+        labId: selectedLab?.id,
+        labName: selectedLab?.name || 'Unknown Lab',
+        testId: test.id,
+        testName: test.name,
+        categoryName: category?.name || selectedCategory?.name || '',
+        turnTime: turnTimeStr,
+        turnTimeHours: rate.hours,
+        price: rate.price,
+        quantity: 1,
+      }]);
+    }
+  };
+
+  const removeFromCart = (cartItemId) => {
+    setCart(cart.filter(item => item.id !== cartItemId));
+  };
+
+  const updateCartQuantity = (cartItemId, newQuantity) => {
+    if (newQuantity <= 0) {
+      removeFromCart(cartItemId);
+      return;
+    }
+    setCart(cart.map(item =>
+      item.id === cartItemId ? { ...item, quantity: newQuantity } : item
+    ));
+  };
+
+  // Calculate cart totals
+  const getCartTotals = () => {
+    let totalSamples = 0;
+    let totalCost = 0;
+    cart.forEach(item => {
+      totalSamples += item.quantity;
+      totalCost += item.quantity * item.price;
+    });
+    return { totalSamples, totalCost };
+  };
+
+  // Group cart by lab
+  const getCartGroupedByLab = () => {
+    const grouped = {};
+    cart.forEach(item => {
+      if (!grouped[item.labName]) {
+        grouped[item.labName] = [];
+      }
+      grouped[item.labName].push(item);
+    });
+    return grouped;
+  };
 
   /**
    * Generic, mapping-driven derivation of Lab Fees quantities from HRS outputs.
@@ -782,49 +851,67 @@ const LabTests = () => {
   // Save order with staff assignments
   const handleSaveOrder = async () => {
     try {
-      calculateOrderSummary(); // Calculate to get order details
       calculateStaffCosts(); // Calculate to get staff costs
 
-      // Build order details from quantities (derived from HRS outputs or manually entered)
-      // CRITICAL: quantities is the canonical order items collection
-      // All items (derived or manual) are included in persistence
-      // NOTE: Do NOT use rate.sample_count - quantities state is the source of truth
+      // Build order details from cart (cross-lab) or quantities (legacy/HRS)
       const orderDetails = {};
-      Object.entries(quantities).forEach(([key, quantity]) => {
-        if (quantity > 0) {
-          // Split key: format is "testName-turnTime"
-          // Use lastIndexOf to handle test names that might contain hyphens
-          const lastDashIndex = key.lastIndexOf('-');
-          if (lastDashIndex === -1) return;
-          const testName = key.substring(0, lastDashIndex);
-          const turnTime = key.substring(lastDashIndex + 1);
 
-          // Find the test and rate to get IDs
-          categories.forEach(category => {
-            if (category.tests) {
-              category.tests.forEach(test => {
-                if (test.name === testName && test.rates) {
-                  test.rates.forEach(rate => {
-                    const rateTurnTime = typeof rate.turn_time === 'string'
-                      ? rate.turn_time
-                      : rate.turn_time?.label || 'unknown';
+      if (cart.length > 0) {
+        // Cart-based: each item has testId, turnTime, quantity, labId
+        cart.forEach(item => {
+          const testId = item.testId.toString();
+          // Use a composite key that includes lab info
+          const key = `${testId}_lab${item.labId}`;
+          if (!orderDetails[key]) {
+            orderDetails[key] = {
+              test_id: item.testId,
+              lab_id: item.labId,
+              lab_name: item.labName,
+              test_name: item.testName,
+              category_name: item.categoryName,
+              turn_time: item.turnTime,
+              quantity: item.quantity,
+              price: item.price,
+            };
+          } else {
+            orderDetails[key].quantity += item.quantity;
+          }
+        });
+      } else {
+        // Fallback: build from quantities (for HRS-derived data)
+        Object.entries(quantities).forEach(([key, quantity]) => {
+          if (quantity > 0) {
+            const lastDashIndex = key.lastIndexOf('-');
+            if (lastDashIndex === -1) return;
+            const testName = key.substring(0, lastDashIndex);
+            const turnTime = key.substring(lastDashIndex + 1);
 
-                    if (rateTurnTime === turnTime) {
-                      const testId = test.id.toString();
-                      const turnTimeId = rate.turn_time_id?.toString() || '';
+            categories.forEach(category => {
+              if (category.tests) {
+                category.tests.forEach(test => {
+                  if (test.name === testName && test.rates) {
+                    test.rates.forEach(rate => {
+                      const rateTurnTime = typeof rate.turn_time === 'string'
+                        ? rate.turn_time
+                        : rate.turn_time?.label || 'unknown';
 
-                      if (!orderDetails[testId]) {
-                        orderDetails[testId] = {};
+                      if (rateTurnTime === turnTime) {
+                        const testId = test.id.toString();
+                        const turnTimeId = rate.turn_time_id?.toString() || '';
+
+                        if (!orderDetails[testId]) {
+                          orderDetails[testId] = {};
+                        }
+                        orderDetails[testId][turnTimeId] = quantity;
                       }
-                      orderDetails[testId][turnTimeId] = quantity;
-                    }
-                  });
-                }
-              });
-            }
-          });
-        }
-      });
+                    });
+                  }
+                });
+              }
+            });
+          }
+        });
+      }
 
       // Build staff assignments
       const staffAssignments = staffRows
@@ -835,21 +922,59 @@ const LabTests = () => {
           hours_per_person: row.hours_per_person
         }));
 
+      const { totalCost } = getCartTotals();
       const orderData = {
         project_name: project?.name || null,
         hrs_estimation_id: hrsEstimationId,
         order_details: orderDetails,
         staff_assignments: staffAssignments,
-        // Store import metadata in inputs so rehydration doesn't need to check HRS outputs
-        // ROW-LEVEL LOCKING: Track if any quantities were imported (for rehydration)
         quantities_imported_from_hrs: derivedQuantityKeys.size > 0,
-        imported_hrs_snapshot_id: importedHrsSnapshotId
+        imported_hrs_snapshot_id: importedHrsSnapshotId,
+        cart_items: cart, // Store full cart for rehydration
       };
 
       const result = await labFeesAPI.createOrder(orderData);
-      alert(`Order saved successfully! Order ID: ${result.id}\nTotal Cost: $${result.total_cost.toFixed(2)}`);
+      alert(`Order saved successfully! Order ID: ${result.id}\nTotal Cost: $${result.total_cost?.toFixed(2) || totalCost.toFixed(2)}`);
     } catch (error) {
       alert('Error saving order: ' + (error.response?.data?.detail || error.message));
+    }
+  };
+
+  // Create New Lab Handler (supports duplicating from existing lab)
+  const handleCreateLab = async () => {
+    if (!newLab.name.trim()) {
+      alert('Please enter a lab name');
+      return;
+    }
+    try {
+      const labData = {
+        name: newLab.name.trim(),
+        address: newLab.address.trim() || null,
+        contact_info: newLab.contact_info.trim() || null,
+      };
+
+      let created;
+      if (newLab.duplicateFromId) {
+        // Duplicate: copies all categories, tests, and rates from source lab
+        created = await labFeesAPI.duplicateLab(newLab.duplicateFromId, labData);
+      } else {
+        // Create empty lab
+        created = await labFeesAPI.createLab(labData);
+      }
+
+      // Refresh labs list and select the new lab
+      const updatedLabs = await labFeesAPI.getLabs();
+      setLabs(updatedLabs);
+      const createdLab = updatedLabs.find(l => l.id === created.id);
+      if (createdLab) handleLabChange(createdLab);
+      setNewLab({ name: '', address: '', contact_info: '', duplicateFromId: '' });
+      setShowAddLabModal(false);
+      alert(newLab.duplicateFromId
+        ? `Lab "${labData.name}" created with all categories, tests, and pricing copied! You can now delete tests that don't apply.`
+        : `Lab "${labData.name}" created! Add categories and tests to get started.`
+      );
+    } catch (error) {
+      alert('Error creating lab: ' + (error.response?.data?.detail || error.message));
     }
   };
 
@@ -1061,21 +1186,35 @@ const LabTests = () => {
         {/* Laboratory Selector and Categories Sidebar */}
         <div className="categories-sidebar">
           <div className="lab-selector-section">
-            <h3>Select Laboratory</h3>
-            <select
-              value={selectedLab?.id || ''}
-              onChange={(e) => {
-                const lab = labs.find(l => l.id === parseInt(e.target.value));
-                if (lab) handleLabChange(lab);
-              }}
-              className="lab-dropdown large"
+            <h3>🔬 Laboratory</h3>
+            <div className="lab-selector-cards">
+              {labs.map(lab => {
+                const labCartCount = cart.filter(item => item.labId === lab.id).length;
+                return (
+                  <button
+                    key={lab.id}
+                    className={`lab-selector-card ${selectedLab?.id === lab.id ? 'active' : ''}`}
+                    onClick={() => handleLabChange(lab)}
+                  >
+                    <span className="lab-card-name">{lab.name}</span>
+                    {labCartCount > 0 && (
+                      <span className="lab-cart-badge">{labCartCount}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            {cart.length > 0 && (
+              <div className="cart-summary-mini">
+                🛒 {cart.length} test{cart.length !== 1 ? 's' : ''} in estimate
+              </div>
+            )}
+            <button
+              className="add-lab-btn"
+              onClick={() => setShowAddLabModal(true)}
             >
-              {labs.map(lab => (
-                <option key={lab.id} value={lab.id}>
-                  {lab.name}
-                </option>
-              ))}
-            </select>
+              ➕ Add New Lab
+            </button>
           </div>
 
           <h3>Service Categories</h3>
@@ -1197,6 +1336,7 @@ const LabTests = () => {
                       <div>Turnaround Time</div>
                       <div>Price</div>
                       <div>Total</div>
+                      <div>Action</div>
                     </div>
                     {selectedTest.rates
                       .sort((a, b) => a.hours - b.hours)
@@ -1306,6 +1446,19 @@ const LabTests = () => {
                             <div className="total-cost">
                               {quantity > 0 ? formatPrice(totalCost) : '-'}
                             </div>
+                            <div className="add-to-cart-cell">
+                              <button
+                                type="button"
+                                className="add-to-cart-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  addToCart(selectedTest, rate, selectedCategory);
+                                }}
+                                title="Add to Estimate"
+                              >
+                                Add ➕
+                              </button>
+                            </div>
                           </div>
                         );
                       })}
@@ -1317,31 +1470,80 @@ const LabTests = () => {
         </div>
       </div>
 
-      {/* Total Cost Summary */}
-      {Object.values(quantities).some(q => q > 0) && (() => {
-        // CRITICAL: Use calculateOrderSummary() which correctly searches all categories
-        // This ensures derived quantities from HRS import are included in totals
-        // calculateOrderSummary() already has the correct logic that searches across
-        // all categories, not just selectedCategory, so derived rows are included
-        const { totalCost, breakdown } = calculateOrderSummary();
+      {/* Cart-Based Order Summary */}
+      {cart.length > 0 && (() => {
+        const grouped = getCartGroupedByLab();
+        const { totalSamples, totalCost } = getCartTotals();
         return (
-          <div className="total-cost-summary">
-            <div className="summary-container">
-              <h3> Order Summary</h3>
-              <div className="summary-details">
-                <div className="summary-item">
-                  <span>Total Cost:</span>
-                  <span className="total-cost-amount">{formatPrice(totalCost)}</span>
-                </div>
-              </div>
-              <div className="order-breakdown">
-                {breakdown.map((item, index) => (
-                  <div key={`${item.categoryName}-${item.testName}-${item.turnTime}-${index}`} className="breakdown-item">
-                    <span>{item.categoryName} ({selectedLab?.name}): {item.testName} ({item.turnTime}) ×{item.sampleCount}</span>
-                    <span>{formatPrice(item.cost)}</span>
-                  </div>
-                ))}
-              </div>
+          <div className="order-summary-container">
+            <div className="order-summary-card">
+              <h3>🛒 Estimate Summary</h3>
+              <table className="estimate-table">
+                <thead>
+                  <tr>
+                    <th>Lab</th>
+                    <th>Test</th>
+                    <th>Turnaround</th>
+                    <th>Qty</th>
+                    <th>Price</th>
+                    <th>Total</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(grouped).map(([labName, items]) => {
+                    const labTotal = items.reduce((sum, item) => sum + item.quantity * item.price, 0);
+                    return (
+                      <React.Fragment key={labName}>
+                        {items.map((item, idx) => (
+                          <tr key={item.id} className="estimate-row">
+                            {idx === 0 ? (
+                              <td rowSpan={items.length} className="estimate-lab-cell">
+                                <span className="estimate-lab-name">🔬 {labName}</span>
+                              </td>
+                            ) : null}
+                            <td>
+                              <div className="estimate-test-name">{item.testName}</div>
+                              <div className="estimate-category">{item.categoryName}</div>
+                            </td>
+                            <td className="estimate-turnaround">{item.turnTime}</td>
+                            <td className="estimate-qty-cell">
+                              <div className="estimate-qty-controls">
+                                <button className="quantity-btn" onClick={() => updateCartQuantity(item.id, item.quantity - 1)}>−</button>
+                                <span className="estimate-qty-value">{item.quantity}</span>
+                                <button className="quantity-btn" onClick={() => updateCartQuantity(item.id, item.quantity + 1)}>+</button>
+                              </div>
+                            </td>
+                            <td className="estimate-price">{formatPrice(item.price)}</td>
+                            <td className="estimate-total">{formatPrice(item.quantity * item.price)}</td>
+                            <td>
+                              <button
+                                onClick={() => removeFromCart(item.id)}
+                                className="estimate-remove-btn"
+                                title="Remove from estimate"
+                              >✕</button>
+                            </td>
+                          </tr>
+                        ))}
+                        <tr className="estimate-subtotal-row">
+                          <td colSpan="5" style={{ textAlign: 'right', fontWeight: '700' }}>Lab Subtotal:</td>
+                          <td className="estimate-total" style={{ fontWeight: '700' }}>{formatPrice(labTotal)}</td>
+                          <td></td>
+                        </tr>
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="estimate-grand-total-row">
+                    <td colSpan="3" style={{ textAlign: 'right', fontWeight: '800' }}>Grand Total</td>
+                    <td style={{ fontWeight: '700', textAlign: 'center' }}>{totalSamples}</td>
+                    <td></td>
+                    <td className="estimate-grand-total">{formatPrice(totalCost)}</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           </div>
         );
@@ -1367,7 +1569,7 @@ const LabTests = () => {
       {/* Field Collection Staff Section */}
       {(() => {
         const { totalSamples } = calculateOrderSummary();
-        return (showStaffSection || staffRows.some(row => row.role) || totalSamples > 0);
+        return (showStaffSection || staffRows.some(row => row.role) || totalSamples > 0 || cart.length > 0);
       })() && (
           <div style={{ maxWidth: '1200px', margin: '10px auto 30px', padding: '0 20px' }}>
             <div style={{ background: 'white', padding: '25px', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
@@ -1538,9 +1740,12 @@ const LabTests = () => {
       {(() => {
         const { totalSamples, totalCost, breakdown } = calculateOrderSummary();
         const { totalCost: staffCost, breakdown: staffBreakdown } = calculateStaffCosts();
-        const grandTotal = totalCost + staffCost;
+        const { totalSamples: cartSamples, totalCost: cartCost } = getCartTotals();
+        const combinedSamples = totalSamples + cartSamples;
+        const combinedLabCost = totalCost + cartCost;
+        const grandTotal = combinedLabCost + staffCost;
 
-        if (totalSamples > 0 || totalCost > 0 || staffCost > 0) {
+        if (combinedSamples > 0 || combinedLabCost > 0 || staffCost > 0) {
           return (
             <div className="order-summary-container">
               <div className="order-summary-card">
@@ -1600,13 +1805,13 @@ const LabTests = () => {
                     <div className="order-summary-item">
                       <span className="order-summary-label">Total Samples:</span>
                       <span className="order-summary-value">
-                        {totalSamples.toLocaleString('en-US')}
+                        {combinedSamples.toLocaleString('en-US')}
                       </span>
                     </div>
                     <div className="order-summary-item">
                       <span className="order-summary-label">Lab Fees Cost:</span>
                       <span className="order-summary-value">
-                        ${totalCost.toLocaleString('en-US', {
+                        ${combinedLabCost.toLocaleString('en-US', {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2
                         })}
@@ -1667,7 +1872,7 @@ const LabTests = () => {
                   {/* Add Labor Button REMOVED */}
 
                   {/* Calculation Breakdown Toggle */}
-                  {(totalSamples > 0 || totalCost > 0 || staffCost > 0) && (
+                  {(combinedSamples > 0 || combinedLabCost > 0 || staffCost > 0) && (
                     <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '2px solid #e0e0e0', textAlign: 'center' }}>
                       <button
                         className={`show-breakdown-btn ${showBreakdown ? 'active' : ''}`}
@@ -1756,6 +1961,77 @@ const LabTests = () => {
         }
         return null;
       })()}
+
+      {/* Add Lab Modal */}
+      {showAddLabModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>🔬 Add New Laboratory</h3>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              handleCreateLab();
+            }}>
+              <div className="form-group">
+                <label htmlFor="lab-name">Lab Name: *</label>
+                <input
+                  id="lab-name"
+                  type="text"
+                  value={newLab.name}
+                  onChange={(e) => setNewLab({ ...newLab, name: e.target.value })}
+                  placeholder="e.g. ATLAS, EMLab P&K"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="lab-duplicate">Copy data from:</label>
+                <select
+                  id="lab-duplicate"
+                  value={newLab.duplicateFromId || ''}
+                  onChange={(e) => setNewLab({ ...newLab, duplicateFromId: e.target.value ? parseInt(e.target.value) : '' })}
+                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '2px solid #ddd', fontSize: '0.95rem' }}
+                >
+                  <option value="">— Start empty (no data) —</option>
+                  {labs.map(lab => (
+                    <option key={lab.id} value={lab.id}>{lab.name} (copy all categories, tests & pricing)</option>
+                  ))}
+                </select>
+                <p style={{ fontSize: '0.8rem', color: '#7f8c8d', margin: '6px 0 0' }}>
+                  Select a lab to copy all its categories, tests, and pricing into the new lab. You can then delete what doesn't apply.
+                </p>
+              </div>
+              <div className="form-group">
+                <label htmlFor="lab-address">Address:</label>
+                <input
+                  id="lab-address"
+                  type="text"
+                  value={newLab.address}
+                  onChange={(e) => setNewLab({ ...newLab, address: e.target.value })}
+                  placeholder="Optional"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="lab-contact">Contact Info:</label>
+                <input
+                  id="lab-contact"
+                  type="text"
+                  value={newLab.contact_info}
+                  onChange={(e) => setNewLab({ ...newLab, contact_info: e.target.value })}
+                  placeholder="Optional"
+                />
+              </div>
+              <div className="modal-actions">
+                <button type="submit" className="modal-btn primary">
+                  {newLab.duplicateFromId ? '📋 Duplicate & Create Lab' : 'Create Lab'}
+                </button>
+                <button type="button" className="modal-btn secondary" onClick={() => {
+                  setShowAddLabModal(false);
+                  setNewLab({ name: '', address: '', contact_info: '', duplicateFromId: '' });
+                }}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Add Category Modal */}
       {showAddCategoryModal && (

@@ -23,6 +23,28 @@ export const labFeesAPI = {
     }
   },
 
+  // Create a new laboratory
+  createLab: async (labData) => {
+    try {
+      const response = await api.post('/lab-fees/labs/', labData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating lab:', error);
+      throw error;
+    }
+  },
+
+  // Duplicate an existing laboratory with all categories, tests, and rates
+  duplicateLab: async (sourceLabId, labData) => {
+    try {
+      const response = await api.post(`/lab-fees/labs/${sourceLabId}/duplicate`, labData);
+      return response.data;
+    } catch (error) {
+      console.error('Error duplicating lab:', error);
+      throw error;
+    }
+  },
+
   // Get service categories for a specific lab
   getCategories: async (labId) => {
     try {

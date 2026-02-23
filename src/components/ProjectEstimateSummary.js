@@ -33,14 +33,21 @@ const ProjectEstimateSummary = () => {
       setSummary(summaryData);
       setSnapshot(snapshotData);
 
-      // Fetch categories for Lab Fees breakdown (if needed)
+      // Fetch categories for Lab Fees breakdown from ALL labs
       if (snapshotData?.lab_fees_data) {
         try {
           const labs = await labFeesAPI.getLabs();
-          if (labs.length > 0) {
-            const labCategories = await labFeesAPI.getCategoriesForLab(labs[0].id);
-            setCategories(labCategories);
+          const allCategories = [];
+          for (const lab of labs) {
+            const labCategories = await labFeesAPI.getCategoriesForLab(lab.id);
+            // Tag each category with its lab name for attribution
+            labCategories.forEach(cat => {
+              cat.labName = lab.name;
+              cat.labId = lab.id;
+            });
+            allCategories.push(...labCategories);
           }
+          setCategories(allCategories);
         } catch (err) {
           console.warn('Could not fetch categories for breakdown:', err);
         }

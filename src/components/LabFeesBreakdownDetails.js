@@ -58,37 +58,39 @@ const LabFeesBreakdownDetails = ({ details, inputs, categories = [] }) => {
   // Parse order_details to get test breakdown
   const getTestBreakdown = () => {
     if (!inputs?.order_details) return [];
-    
+
     const breakdown = [];
     const orderDetails = inputs.order_details;
-    
+
     // order_details format: {"test_id": {"turn_time_id": quantity, ...}, ...}
     Object.entries(orderDetails).forEach(([testIdStr, turnTimes]) => {
       const testId = parseInt(testIdStr);
-      
+
       Object.entries(turnTimes).forEach(([turnTimeIdStr, quantity]) => {
         const turnTimeId = parseInt(turnTimeIdStr);
         const qty = parseFloat(quantity) || 0;
-        
+
         if (qty > 0) {
           // Find test and rate in categories
           let testName = `Test ID ${testId}`;
           let turnTimeLabel = `Turnaround ID ${turnTimeId}`;
           let price = 0;
           let categoryName = 'Unknown';
-          
+          let labNameFromCategory = '';
+
           for (const category of categories) {
             if (category.tests) {
               for (const test of category.tests) {
                 if (test.id === testId && test.rates) {
                   testName = test.name;
                   categoryName = category.name;
-                  
+                  labNameFromCategory = category.labName || '';
+
                   for (const rate of test.rates) {
-                    const rateTurnTimeId = typeof rate.turn_time === 'object' 
-                      ? rate.turn_time?.id 
+                    const rateTurnTimeId = typeof rate.turn_time === 'object'
+                      ? rate.turn_time?.id
                       : rate.turn_time_id;
-                    
+
                     if (rateTurnTimeId === turnTimeId) {
                       price = rate.price || 0;
                       turnTimeLabel = typeof rate.turn_time === 'object'
@@ -102,9 +104,10 @@ const LabFeesBreakdownDetails = ({ details, inputs, categories = [] }) => {
               }
             }
           }
-          
+
           const cost = qty * price;
           breakdown.push({
+            labName: labNameFromCategory || '',
             categoryName,
             testName,
             turnTime: turnTimeLabel,
@@ -115,7 +118,7 @@ const LabFeesBreakdownDetails = ({ details, inputs, categories = [] }) => {
         }
       });
     });
-    
+
     return breakdown;
   };
 
@@ -151,6 +154,7 @@ const LabFeesBreakdownDetails = ({ details, inputs, categories = [] }) => {
               <table className="breakdown-table" style={{ width: '100%', marginTop: '10px', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
+                    <th>Lab</th>
                     <th>Category</th>
                     <th>Test Name</th>
                     <th>Turnaround</th>
@@ -162,6 +166,7 @@ const LabFeesBreakdownDetails = ({ details, inputs, categories = [] }) => {
                 <tbody>
                   {testBreakdown.map((item, index) => (
                     <tr key={index}>
+                      <td style={{ fontWeight: '600', color: '#2c3e50' }}>{item.labName || '—'}</td>
                       <td>{item.categoryName}</td>
                       <td>{item.testName}</td>
                       <td>{item.turnTime}</td>
@@ -178,7 +183,7 @@ const LabFeesBreakdownDetails = ({ details, inputs, categories = [] }) => {
                 </tbody>
                 <tfoot>
                   <tr className="breakdown-total-row">
-                    <td colSpan="3"><strong>Total Lab Fees Cost</strong></td>
+                    <td colSpan="4"><strong>Total Lab Fees Cost</strong></td>
                     <td className="text-right"><strong>{formatNumber(totalSamples, 0)}</strong></td>
                     <td></td>
                     <td className="text-right"><strong>{formatCurrency(totalLabFeesCost)}</strong></td>

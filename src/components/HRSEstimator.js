@@ -228,13 +228,18 @@ const HRSEstimator = () => {
 
   // Asbestos Sampling state
   const [asbestosData, setAsbestosData] = useState({
-    'GWB/JC': { actuals: '', bulks_per_unit: '', unit_label: 'Rooms' },
+    'Walls': { actuals: '', bulks_per_unit: '', unit_label: 'Rooms' },
     'Flooring': { actuals: '', bulks_per_unit: '', unit_label: 'Rooms' },
     'Ceilings': { actuals: '', bulks_per_unit: '', unit_label: 'Rooms' },
     'Exterior Sides (CAB, etc.)': { actuals: '', bulks_per_unit: '', unit_label: 'LF' },
     'Piping': { actuals: '', bulks_per_unit: '', unit_label: 'LF' },
     'Tanks': { actuals: '', bulks_per_unit: '', unit_label: 'EA' },
   });
+
+  // Custom rows for each section
+  const [customAsbestosRows, setCustomAsbestosRows] = useState([]);
+  const [customLeadRows, setCustomLeadRows] = useState([]);
+  const [customMoldRows, setCustomMoldRows] = useState([]);
 
   // Lead Sampling state
   const [leadData, setLeadData] = useState({
@@ -274,6 +279,15 @@ const HRSEstimator = () => {
       totalPLM += bulkSummary;
     });
 
+    // Include custom rows
+    customAsbestosRows.forEach((row) => {
+      const actuals = parseInt(row.actuals) || 0;
+      const bulksPerUnit = parseInt(row.bulks_per_unit) || 0;
+      const bulkSummary = Math.round(actuals * bulksPerUnit);
+      bulkSummaries[row.name || 'Custom'] = bulkSummary;
+      totalPLM += bulkSummary;
+    });
+
     return { bulkSummaries, totalPLM };
   };
 
@@ -285,6 +299,12 @@ const HRSEstimator = () => {
     Object.values(leadData).forEach(data => {
       totalXRF += parseInt(data.xrf_shots) || 0;
       totalChipsWipes += parseInt(data.chips_wipes) || 0;
+    });
+
+    // Include custom rows
+    customLeadRows.forEach(row => {
+      totalXRF += parseInt(row.xrf_shots) || 0;
+      totalChipsWipes += parseInt(row.chips_wipes) || 0;
     });
 
     return { totalXRF, totalChipsWipes };
@@ -302,6 +322,13 @@ const HRSEstimator = () => {
       totalCulturable += parseInt(data.culturable) || 0;
     });
 
+    // Include custom rows
+    customMoldRows.forEach(row => {
+      totalTapeLift += parseInt(row.tape_lift) || 0;
+      totalSporeTrap += parseInt(row.spore_trap) || 0;
+      totalCulturable += parseInt(row.culturable) || 0;
+    });
+
     return { totalTapeLift, totalSporeTrap, totalCulturable };
   };
 
@@ -312,28 +339,51 @@ const HRSEstimator = () => {
     setEstimationResult(null);
 
     try {
-      // Build asbestos_lines
-      const asbestosLines = Object.entries(asbestosData).map(([component_name, data]) => ({
-        component_name,
-        unit_label: data.unit_label,
-        actuals: parseInt(data.actuals) || 0,
-        bulks_per_unit: parseInt(data.bulks_per_unit) || 0,
-      }));
+      // Build asbestos_lines (default + custom)
+      const asbestosLines = [
+        ...Object.entries(asbestosData).map(([component_name, data]) => ({
+          component_name,
+          unit_label: data.unit_label,
+          actuals: parseInt(data.actuals) || 0,
+          bulks_per_unit: parseInt(data.bulks_per_unit) || 0,
+        })),
+        ...customAsbestosRows.filter(r => r.name).map(row => ({
+          component_name: row.name,
+          unit_label: row.unit_label || 'EA',
+          actuals: parseInt(row.actuals) || 0,
+          bulks_per_unit: parseInt(row.bulks_per_unit) || 0,
+        })),
+      ];
 
-      // Build lead_lines
-      const leadLines = Object.entries(leadData).map(([component_name, data]) => ({
-        component_name,
-        xrf_shots: parseInt(data.xrf_shots) || 0,
-        chips_wipes: parseInt(data.chips_wipes) || 0,
-      }));
+      // Build lead_lines (default + custom)
+      const leadLines = [
+        ...Object.entries(leadData).map(([component_name, data]) => ({
+          component_name,
+          xrf_shots: parseInt(data.xrf_shots) || 0,
+          chips_wipes: parseInt(data.chips_wipes) || 0,
+        })),
+        ...customLeadRows.filter(r => r.name).map(row => ({
+          component_name: row.name,
+          xrf_shots: parseInt(row.xrf_shots) || 0,
+          chips_wipes: parseInt(row.chips_wipes) || 0,
+        })),
+      ];
 
-      // Build mold_lines
-      const moldLines = Object.entries(moldData).map(([component_name, data]) => ({
-        component_name,
-        tape_lift: parseInt(data.tape_lift) || 0,
-        spore_trap: parseInt(data.spore_trap) || 0,
-        culturable: parseInt(data.culturable) || 0,
-      }));
+      // Build mold_lines (default + custom)
+      const moldLines = [
+        ...Object.entries(moldData).map(([component_name, data]) => ({
+          component_name,
+          tape_lift: parseInt(data.tape_lift) || 0,
+          spore_trap: parseInt(data.spore_trap) || 0,
+          culturable: parseInt(data.culturable) || 0,
+        })),
+        ...customMoldRows.filter(r => r.name).map(row => ({
+          component_name: row.name,
+          tape_lift: parseInt(row.tape_lift) || 0,
+          spore_trap: parseInt(row.spore_trap) || 0,
+          culturable: parseInt(row.culturable) || 0,
+        })),
+      ];
 
       // Build request payload
       const payload = {
@@ -420,14 +470,16 @@ const HRSEstimator = () => {
 
       // Load asbestos data
       if (estimation.asbestos_lines) {
+        const defaultAsbestosKeys = ['Walls', 'Flooring', 'Ceilings', 'Exterior Sides (CAB, etc.)', 'Piping', 'Tanks'];
         const newAsbestosData = {
-          'GWB/JC': { actuals: '', bulks_per_unit: '', unit_label: 'Rooms' },
+          'Walls': { actuals: '', bulks_per_unit: '', unit_label: 'Rooms' },
           'Flooring': { actuals: '', bulks_per_unit: '', unit_label: 'Rooms' },
           'Ceilings': { actuals: '', bulks_per_unit: '', unit_label: 'Rooms' },
           'Exterior Sides (CAB, etc.)': { actuals: '', bulks_per_unit: '', unit_label: 'LF' },
           'Piping': { actuals: '', bulks_per_unit: '', unit_label: 'LF' },
           'Tanks': { actuals: '', bulks_per_unit: '', unit_label: 'EA' },
         };
+        const loadedCustomAsbestos = [];
         estimation.asbestos_lines.forEach(line => {
           if (newAsbestosData[line.component_name]) {
             newAsbestosData[line.component_name] = {
@@ -435,13 +487,23 @@ const HRSEstimator = () => {
               bulks_per_unit: line.bulks_per_unit?.toString() || '',
               unit_label: line.unit_label || newAsbestosData[line.component_name].unit_label,
             };
+          } else if (!defaultAsbestosKeys.includes(line.component_name)) {
+            // Custom row from saved data
+            loadedCustomAsbestos.push({
+              name: line.component_name,
+              actuals: line.actuals?.toString() || '',
+              bulks_per_unit: line.bulks_per_unit?.toString() || '',
+              unit_label: line.unit_label || 'EA',
+            });
           }
         });
         setAsbestosData(newAsbestosData);
+        if (loadedCustomAsbestos.length > 0) setCustomAsbestosRows(loadedCustomAsbestos);
       }
 
       // Load lead data
       if (estimation.lead_lines) {
+        const defaultLeadKeys = ['Walls', 'Windows', 'Doors', 'Exterior', 'Other'];
         const newLeadData = {
           'Walls': { xrf_shots: '', chips_wipes: '' },
           'Windows': { xrf_shots: '', chips_wipes: '' },
@@ -449,19 +511,28 @@ const HRSEstimator = () => {
           'Exterior': { xrf_shots: '', chips_wipes: '' },
           'Other': { xrf_shots: '', chips_wipes: '' },
         };
+        const loadedCustomLead = [];
         estimation.lead_lines.forEach(line => {
           if (newLeadData[line.component_name]) {
             newLeadData[line.component_name] = {
               xrf_shots: line.xrf_shots?.toString() || '',
               chips_wipes: line.chips_wipes?.toString() || '',
             };
+          } else if (!defaultLeadKeys.includes(line.component_name)) {
+            loadedCustomLead.push({
+              name: line.component_name,
+              xrf_shots: line.xrf_shots?.toString() || '',
+              chips_wipes: line.chips_wipes?.toString() || '',
+            });
           }
         });
         setLeadData(newLeadData);
+        if (loadedCustomLead.length > 0) setCustomLeadRows(loadedCustomLead);
       }
 
       // Load mold data
       if (estimation.mold_lines) {
+        const defaultMoldKeys = ['Living Room', 'Kitchen', 'Bath', 'Crawl Space', 'Mech Room', 'Bedroom'];
         const newMoldData = {
           'Living Room': { tape_lift: '', spore_trap: '', culturable: '' },
           'Kitchen': { tape_lift: '', spore_trap: '', culturable: '' },
@@ -470,6 +541,7 @@ const HRSEstimator = () => {
           'Mech Room': { tape_lift: '', spore_trap: '', culturable: '' },
           'Bedroom': { tape_lift: '', spore_trap: '', culturable: '' },
         };
+        const loadedCustomMold = [];
         estimation.mold_lines.forEach(line => {
           if (newMoldData[line.component_name]) {
             newMoldData[line.component_name] = {
@@ -477,9 +549,17 @@ const HRSEstimator = () => {
               spore_trap: line.spore_trap?.toString() || '',
               culturable: line.culturable?.toString() || '',
             };
+          } else if (!defaultMoldKeys.includes(line.component_name)) {
+            loadedCustomMold.push({
+              name: line.component_name,
+              tape_lift: line.tape_lift?.toString() || '',
+              spore_trap: line.spore_trap?.toString() || '',
+              culturable: line.culturable?.toString() || '',
+            });
           }
         });
         setMoldData(newMoldData);
+        if (loadedCustomMold.length > 0) setCustomMoldRows(loadedCustomMold);
       }
 
       // Load ORM data
@@ -648,6 +728,86 @@ const HRSEstimator = () => {
                     );
                   })}
                 </div>
+
+                {/* Custom Asbestos Rows */}
+                {customAsbestosRows.map((row, index) => (
+                  <div key={`custom-asbestos-${index}`} className="input-row" style={{ background: '#f0f7ff', borderLeft: '3px solid #3498db' }}>
+                    <div className="component-name">
+                      <input
+                        type="text"
+                        value={row.name}
+                        onChange={(e) => {
+                          const updated = [...customAsbestosRows];
+                          updated[index] = { ...row, name: e.target.value };
+                          setCustomAsbestosRows(updated);
+                        }}
+                        className="form-input small"
+                        placeholder="Enter name..."
+                        style={{ fontWeight: 'bold', border: '1px dashed #3498db' }}
+                      />
+                    </div>
+                    <div className="input-group">
+                      <label>Number of Units</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={row.actuals}
+                        onChange={(e) => {
+                          let value = e.target.value;
+                          if (value !== '' && !isNaN(value)) {
+                            value = Math.floor(Math.max(0, parseInt(value) || 0)).toString();
+                          }
+                          const updated = [...customAsbestosRows];
+                          updated[index] = { ...row, actuals: value };
+                          setCustomAsbestosRows(updated);
+                        }}
+                        className="form-input small"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="input-group">
+                      <label>Bulk Samples per Unit</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={row.bulks_per_unit}
+                        onChange={(e) => {
+                          let value = e.target.value;
+                          if (value !== '' && !isNaN(value)) {
+                            value = Math.floor(Math.max(0, parseInt(value) || 0)).toString();
+                          }
+                          const updated = [...customAsbestosRows];
+                          updated[index] = { ...row, bulks_per_unit: value };
+                          setCustomAsbestosRows(updated);
+                        }}
+                        className="form-input small"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="calculated-value">
+                      <label>Total</label>
+                      <div className="value-display">
+                        {Math.round((parseInt(row.actuals) || 0) * (parseInt(row.bulks_per_unit) || 0))}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCustomAsbestosRows(customAsbestosRows.filter((_, i) => i !== index))}
+                      style={{ background: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 10px', cursor: 'pointer', fontSize: '0.85rem', alignSelf: 'center' }}
+                    >✕</button>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() => setCustomAsbestosRows([...customAsbestosRows, { name: '', actuals: '', bulks_per_unit: '', unit_label: 'EA' }])}
+                  style={{ marginTop: '10px', padding: '8px 16px', background: '#3498db', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: '600' }}
+                >
+                  + Add Custom Row
+                </button>
+
                 <div className="section-total">
                   <strong>Total PLM: {Math.round(asbestosTotals.totalPLM)}</strong>
                 </div>
@@ -717,6 +877,80 @@ const HRSEstimator = () => {
                     </div>
                   ))}
                 </div>
+
+                {/* Custom Lead Rows */}
+                {customLeadRows.map((row, index) => (
+                  <div key={`custom-lead-${index}`} className="input-row" style={{ background: '#f0f7ff', borderLeft: '3px solid #3498db' }}>
+                    <div className="component-name">
+                      <input
+                        type="text"
+                        value={row.name}
+                        onChange={(e) => {
+                          const updated = [...customLeadRows];
+                          updated[index] = { ...row, name: e.target.value };
+                          setCustomLeadRows(updated);
+                        }}
+                        className="form-input small"
+                        placeholder="Enter name..."
+                        style={{ fontWeight: 'bold', border: '1px dashed #3498db' }}
+                      />
+                    </div>
+                    <div className="input-group">
+                      <label>Number of XRF Shots</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={row.xrf_shots}
+                        onChange={(e) => {
+                          let value = e.target.value;
+                          if (value !== '' && !isNaN(value)) {
+                            value = Math.floor(Math.max(0, parseInt(value) || 0)).toString();
+                          }
+                          const updated = [...customLeadRows];
+                          updated[index] = { ...row, xrf_shots: value };
+                          setCustomLeadRows(updated);
+                        }}
+                        className="form-input small"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="input-group">
+                      <label>Number of Chips/Wipes</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={row.chips_wipes}
+                        onChange={(e) => {
+                          let value = e.target.value;
+                          if (value !== '' && !isNaN(value)) {
+                            value = Math.floor(Math.max(0, parseInt(value) || 0)).toString();
+                          }
+                          const updated = [...customLeadRows];
+                          updated[index] = { ...row, chips_wipes: value };
+                          setCustomLeadRows(updated);
+                        }}
+                        className="form-input small"
+                        placeholder="0"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCustomLeadRows(customLeadRows.filter((_, i) => i !== index))}
+                      style={{ background: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 10px', cursor: 'pointer', fontSize: '0.85rem', alignSelf: 'center' }}
+                    >✕</button>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() => setCustomLeadRows([...customLeadRows, { name: '', xrf_shots: '', chips_wipes: '' }])}
+                  style={{ marginTop: '10px', padding: '8px 16px', background: '#3498db', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: '600' }}
+                >
+                  + Add Custom Row
+                </button>
+
                 <div className="section-total">
                   <strong>Total XRF Shots: {Math.round(leadTotals.totalXRF)}</strong>
                   <strong>Total Chips/Wipes: {Math.round(leadTotals.totalChipsWipes)}</strong>
@@ -809,6 +1043,100 @@ const HRSEstimator = () => {
                     </div>
                   ))}
                 </div>
+
+                {/* Custom Mold Rows */}
+                {customMoldRows.map((row, index) => (
+                  <div key={`custom-mold-${index}`} className="input-row" style={{ background: '#f0f7ff', borderLeft: '3px solid #3498db' }}>
+                    <div className="component-name">
+                      <input
+                        type="text"
+                        value={row.name}
+                        onChange={(e) => {
+                          const updated = [...customMoldRows];
+                          updated[index] = { ...row, name: e.target.value };
+                          setCustomMoldRows(updated);
+                        }}
+                        className="form-input small"
+                        placeholder="Enter name..."
+                        style={{ fontWeight: 'bold', border: '1px dashed #3498db' }}
+                      />
+                    </div>
+                    <div className="input-group">
+                      <label>Tape Lift Samples</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={row.tape_lift}
+                        onChange={(e) => {
+                          let value = e.target.value;
+                          if (value !== '' && !isNaN(value)) {
+                            value = Math.floor(Math.max(0, parseInt(value) || 0)).toString();
+                          }
+                          const updated = [...customMoldRows];
+                          updated[index] = { ...row, tape_lift: value };
+                          setCustomMoldRows(updated);
+                        }}
+                        className="form-input small"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="input-group">
+                      <label>Spore Trap Samples</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={row.spore_trap}
+                        onChange={(e) => {
+                          let value = e.target.value;
+                          if (value !== '' && !isNaN(value)) {
+                            value = Math.floor(Math.max(0, parseInt(value) || 0)).toString();
+                          }
+                          const updated = [...customMoldRows];
+                          updated[index] = { ...row, spore_trap: value };
+                          setCustomMoldRows(updated);
+                        }}
+                        className="form-input small"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="input-group">
+                      <label>Culturable Samples</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={row.culturable}
+                        onChange={(e) => {
+                          let value = e.target.value;
+                          if (value !== '' && !isNaN(value)) {
+                            value = Math.floor(Math.max(0, parseInt(value) || 0)).toString();
+                          }
+                          const updated = [...customMoldRows];
+                          updated[index] = { ...row, culturable: value };
+                          setCustomMoldRows(updated);
+                        }}
+                        className="form-input small"
+                        placeholder="0"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCustomMoldRows(customMoldRows.filter((_, i) => i !== index))}
+                      style={{ background: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 10px', cursor: 'pointer', fontSize: '0.85rem', alignSelf: 'center' }}
+                    >✕</button>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() => setCustomMoldRows([...customMoldRows, { name: '', tape_lift: '', spore_trap: '', culturable: '' }])}
+                  style={{ marginTop: '10px', padding: '8px 16px', background: '#3498db', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: '600' }}
+                >
+                  + Add Custom Row
+                </button>
+
                 <div className="section-total">
                   <strong>Total Tape Lift: {Math.round(moldTotals.totalTapeLift)}</strong>
                   <strong>Total Spore Trap: {Math.round(moldTotals.totalSporeTrap)}</strong>
@@ -1264,28 +1592,26 @@ const HRSEstimator = () => {
               </div>
             )}
 
-            {/* Calculation Breakdown Toggle - Only for Admin/Manager */}
-            {(userRole === 'admin' || userRole === 'manager') && (
-              <div style={{ marginTop: '30px', textAlign: 'center' }}>
-                <button
-                  className={`show-breakdown-btn ${showBreakdown ? 'active' : ''}`}
-                  onClick={() => setShowBreakdown(!showBreakdown)}
-                  style={{
-                    padding: '12px 24px',
-                    background: showBreakdown ? '#3498db' : '#95a5a6',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '1rem',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease'
-                  }}
-                >
-                  {showBreakdown ? '▼ Hide Detailed Breakdown' : '▶ Show Detailed Breakdown'}
-                </button>
-              </div>
-            )}
+            {/* Calculation Breakdown Toggle */}
+            <div style={{ marginTop: '30px', textAlign: 'center' }}>
+              <button
+                className={`show-breakdown-btn ${showBreakdown ? 'active' : ''}`}
+                onClick={() => setShowBreakdown(!showBreakdown)}
+                style={{
+                  padding: '12px 24px',
+                  background: showBreakdown ? '#3498db' : '#95a5a6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                {showBreakdown ? '▼ Hide Detailed Breakdown' : '▶ Show Detailed Breakdown'}
+              </button>
+            </div>
 
             {/* Detailed Calculation Breakdown */}
             {showBreakdown && (
