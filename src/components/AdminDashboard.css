@@ -231,3 +231,164 @@
     background: #bdc3c7;
     cursor: not-allowed;
 }
+
+/* Tab Navigation */
+.admin-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 25px;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.admin-tab {
+    padding: 14px 28px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 500;
+    color: #888;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+}
+
+.admin-tab:hover {
+    color: #555;
+    background: #f8f9fa;
+}
+
+.admin-tab.active {
+    color: #2c3e50;
+    border-bottom-color: #3498db;
+    font-weight: 600;
+}
+
+/* Section */
+.admin-section {
+    margin-bottom: 30px;
+}
+
+.section-header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.section-header-bar h2 {
+    font-size: 1.3rem;
+    color: #2c3e50;
+    margin: 0;
+}
+
+.section-description {
+    color: #777;
+    font-size: 0.92rem;
+    margin: 0 0 18px 0;
+    line-height: 1.5;
+}
+
+/* Inline Editing */
+.inline-edit-input {
+    padding: 8px 12px;
+    border: 2px solid #3498db;
+    border-radius: 5px;
+    font-size: 0.95rem;
+    outline: none;
+    width: 100%;
+    max-width: 220px;
+    box-sizing: border-box;
+}
+
+.inline-edit-input:focus {
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15);
+}
+
+.rate-edit-field {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.currency-prefix {
+    font-weight: 600;
+    color: #555;
+    font-size: 0.95rem;
+}
+
+.rate-suffix {
+    color: #888;
+    font-size: 0.85rem;
+}
+
+.rate-input {
+    max-width: 120px;
+}
+
+/* Rates Display */
+.rate-role-name {
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.rate-value {
+    font-weight: 600;
+    color: #27ae60;
+    font-size: 1rem;
+}
+
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.edit-btn {
+    background: none;
+    border: 1px solid #ddd;
+    padding: 6px 14px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    color: #555;
+    transition: all 0.2s;
+}
+
+.edit-btn:hover {
+    background: #f0f0f0;
+    border-color: #ccc;
+}
+
+.save-btn {
+    background: #27ae60;
+    color: white;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.save-btn:hover {
+    background: #219a52;
+}
+
+.cancel-edit-btn {
+    background: none;
+    border: 1px solid #ddd;
+    padding: 6px 14px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    color: #999;
+    transition: all 0.2s;
+}
+
+.cancel-edit-btn:hover {
+    background: #f5f5f5;
+    color: #666;
+}

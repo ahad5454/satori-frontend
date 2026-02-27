@@ -99,16 +99,22 @@ const LabTests = () => {
   const [cart, setCart] = useState([]);
 
   // Add test to cart (or increment if already exists)
+  // Uses the quantity from the input field (quantities state) instead of hardcoding 1
   const addToCart = (test, rate, category) => {
     const turnTimeStr = typeof rate.turn_time === 'string' ? rate.turn_time : rate.turn_time?.label || 'unknown';
+    // Read the user-entered quantity from the quantities state directly
+    const quantityKey = `${test.name}-${turnTimeStr}`;
+    const enteredQuantity = quantities[quantityKey] || 0;
+    const qtyToAdd = enteredQuantity > 0 ? enteredQuantity : 1; // Default to 1 if no quantity entered
+
     const existingIndex = cart.findIndex(
       item => item.testId === test.id && item.turnTime === turnTimeStr && item.labId === selectedLab?.id
     );
 
     if (existingIndex >= 0) {
-      // Increment quantity
+      // Add the entered quantity to existing cart item
       const updated = [...cart];
-      updated[existingIndex] = { ...updated[existingIndex], quantity: updated[existingIndex].quantity + 1 };
+      updated[existingIndex] = { ...updated[existingIndex], quantity: updated[existingIndex].quantity + qtyToAdd };
       setCart(updated);
     } else {
       setCart([...cart, {
@@ -121,7 +127,7 @@ const LabTests = () => {
         turnTime: turnTimeStr,
         turnTimeHours: rate.hours,
         price: rate.price,
-        quantity: 1,
+        quantity: qtyToAdd,
       }]);
     }
   };

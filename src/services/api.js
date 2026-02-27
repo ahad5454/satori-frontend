@@ -632,6 +632,50 @@ export const userManagementAPI = {
       throw error;
     }
   },
+
+  // Get all labor rates (staff titles & billing rates)
+  getLaborRates: async () => {
+    try {
+      const response = await api.get('/hrs-estimator/labor-rates');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching labor rates:', error);
+      throw error;
+    }
+  },
+
+  // Create a new labor rate
+  createLaborRate: async (rateData) => {
+    try {
+      const response = await api.post('/hrs-estimator/labor-rates', rateData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating labor rate:', error);
+      throw error;
+    }
+  },
+
+  // Update an existing labor rate
+  updateLaborRate: async (rateId, rateData) => {
+    try {
+      const response = await api.put(`/hrs-estimator/labor-rates/${rateId}`, rateData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating labor rate:', error);
+      throw error;
+    }
+  },
+
+  // Delete a labor rate
+  deleteLaborRate: async (rateId) => {
+    try {
+      const response = await api.delete(`/hrs-estimator/labor-rates/${rateId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting labor rate:', error);
+      throw error;
+    }
+  },
 };
 
 // Authentication API
