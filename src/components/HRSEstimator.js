@@ -226,6 +226,11 @@ const HRSEstimator = () => {
     mold: null,
   });
 
+  const [overridePercentages, setOverridePercentages] = useState({
+    bi: null,
+    tw: null,
+  });
+
   // Asbestos Sampling state
   const [asbestosData, setAsbestosData] = useState({
     'Walls': { actuals: '', bulks_per_unit: '', unit_label: 'Rooms' },
@@ -414,6 +419,14 @@ const HRSEstimator = () => {
         payload.override_minutes_mold = parseFloat(overrideMinutes.mold);
       }
 
+      // Add override_percentages if set
+      if (overridePercentages.bi !== null && overridePercentages.bi !== '') {
+        payload.override_percentage_bi = parseFloat(overridePercentages.bi);
+      }
+      if (overridePercentages.tw !== null && overridePercentages.tw !== '') {
+        payload.override_percentage_tw = parseFloat(overridePercentages.tw);
+      }
+
       // Build staff array from valid rows (preferred method)
       const validStaffRows = staffRows.filter(row => row.role && (parseInt(row.count) || 0) > 0);
       if (validStaffRows.length > 0) {
@@ -598,6 +611,24 @@ const HRSEstimator = () => {
           mold: estimation.override_minutes_mold?.toString() || '',
         }));
         setShowAdvanced(true);
+      }
+
+      // Load override percentages if they exist
+      if (estimation.override_percentages) {
+        if (estimation.override_percentages.bi !== undefined && estimation.override_percentages.bi !== null) {
+          setOverridePercentages(prev => ({
+            ...prev,
+            bi: estimation.override_percentages.bi.toString(),
+          }));
+          setShowAdvanced(true);
+        }
+        if (estimation.override_percentages.tw !== undefined && estimation.override_percentages.tw !== null) {
+          setOverridePercentages(prev => ({
+            ...prev,
+            tw: estimation.override_percentages.tw.toString(),
+          }));
+          setShowAdvanced(true);
+        }
       }
 
       // Load staff breakdown (preferred) or legacy selected_role
@@ -1398,6 +1429,34 @@ const HRSEstimator = () => {
                     />
                   </div>
                 </div>
+
+                <h4 style={{ marginTop: '20px', marginBottom: '15px' }}>Percentage Multipliers</h4>
+                <div className="advanced-grid">
+                  <div className="input-group">
+                    <label>Override % - Building Inspection</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={overridePercentages.bi || ''}
+                      onChange={(e) => setOverridePercentages({ ...overridePercentages, bi: e.target.value })}
+                      className="form-input"
+                      placeholder="Leave empty for 20%"
+                    />
+                  </div>
+                  <div className="input-group">
+                    <label>Override % - Technical Writing</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={overridePercentages.tw || ''}
+                      onChange={(e) => setOverridePercentages({ ...overridePercentages, tw: e.target.value })}
+                      className="form-input"
+                      placeholder="Leave empty for 50%"
+                    />
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -1425,19 +1484,60 @@ const HRSEstimator = () => {
         {estimationResult && (
           <div className="estimation-results">
             <h2>Estimation Results</h2>
-            <div className="results-grid">
+            <div className="results-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+
               <div className="result-card">
-                <h3>Suggested Hours (Base)</h3>
+                <h3>Base Sampling Hours</h3>
                 <div className="result-value">
-                  {estimationResult.suggested_hours_base?.toFixed(2) || 'N/A'} hours
+                  {((estimationResult.suggested_hours_base || 0)
+                    - (estimationResult.bi_hours || 0)
+                    - (estimationResult.tw_hours || 0)
+                    - (estimationResult.orm_hours || 0)).toFixed(2)} hours
                 </div>
               </div>
+
+              <div className="result-card">
+                <h3>Building Inspection</h3>
+                <div className="result-value">
+                  {estimationResult.bi_hours?.toFixed(2) || '0.00'} hours
+                </div>
+                {estimationResult.override_percentages?.bi !== null &&
+                  estimationResult.override_percentages?.bi !== undefined && (
+                    <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '5px' }}>
+                      ({estimationResult.override_percentages.bi}% override)
+                    </div>
+                  )}
+              </div>
+
+              <div className="result-card">
+                <h3>Technical Writing</h3>
+                <div className="result-value">
+                  {estimationResult.tw_hours?.toFixed(2) || '0.00'} hours
+                </div>
+                {estimationResult.override_percentages?.tw !== null &&
+                  estimationResult.override_percentages?.tw !== undefined && (
+                    <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '5px' }}>
+                      ({estimationResult.override_percentages.tw}% override)
+                    </div>
+                  )}
+              </div>
+
+              {estimationResult.orm_hours > 0 && (
+                <div className="result-card">
+                  <h3>ORM Hours</h3>
+                  <div className="result-value">
+                    {estimationResult.orm_hours?.toFixed(2) || '0.00'} hours
+                  </div>
+                </div>
+              )}
+
               <div className="result-card highlight">
-                <h3>Suggested Hours (Final)</h3>
+                <h3>Total Hours</h3>
                 <div className="result-value large">
                   {estimationResult.suggested_hours_final?.toFixed(2) || 'N/A'} hours
                 </div>
               </div>
+
             </div>
 
             {/* Staff Labor Cost Breakdown */}
