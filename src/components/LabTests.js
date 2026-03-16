@@ -94,6 +94,15 @@ const LabTests = () => {
   // Breakdown display state
   const [showBreakdown, setShowBreakdown] = useState(false);
 
+  // Inline price editing state
+  const [editingTestId, setEditingTestId] = useState(null);
+  const [editedPrices, setEditedPrices] = useState({});
+
+  // Rate history state
+  const [showHistory, setShowHistory] = useState(false);
+  const [rateHistory, setRateHistory] = useState({});
+  const [historyLoading, setHistoryLoading] = useState(false);
+
   // Cross-lab cart state
   // Each item: { id, labId, labName, testId, testName, categoryName, turnTime, turnTimeHours, price, quantity }
   const [cart, setCart] = useState([]);
@@ -1017,6 +1026,38 @@ const LabTests = () => {
     }
   };
 
+  // --- Inline Price Edit Handlers ---
+  const handleStartEditPrices = (testId) => {
+    setEditingTestId(testId);
+    setEditedPrices({});
+  };
+
+  const handleCancelEditPrices = () => {
+    setEditingTestId(null);
+    setEditedPrices({});
+  };
+
+  const handleSaveEditedPrices = async () => {
+    try {
+      const updates = Object.entries(editedPrices);
+      if (updates.length === 0) {
+        setEditingTestId(null);
+        return;
+      }
+      for (const [rateId, newPrice] of updates) {
+        await labFeesAPI.updateRate(parseInt(rateId), { price: parseFloat(newPrice) });
+      }
+      setEditingTestId(null);
+      setEditedPrices({});
+      // Refresh categories to pick up updated prices
+      if (selectedLab) {
+        await fetchCategoriesForLab(selectedLab.id);
+      }
+    } catch (error) {
+      alert('Error saving prices: ' + (error.response?.data?.detail || error.message));
+    }
+  };
+
   if (loading) {
     return (
       <div className="loading-container">
@@ -1334,7 +1375,59 @@ const LabTests = () => {
               {/* Detailed Pricing */}
               {selectedTest && (
                 <div className="pricing-details">
-                  <h3>📊 Pricing Details: {selectedTest.name}</h3>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <h3 style={{ margin: 0 }}>📊 Pricing Details: {selectedTest.name}</h3>
+                    {editingTestId === selectedTest.id ? (
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={handleSaveEditedPrices}
+                          style={{
+                            padding: '6px 16px',
+                            backgroundColor: '#27ae60',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            fontSize: '0.85rem'
+                          }}
+                        >
+                          ✓ Save Prices
+                        </button>
+                        <button
+                          onClick={handleCancelEditPrices}
+                          style={{
+                            padding: '6px 16px',
+                            backgroundColor: '#95a5a6',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            fontSize: '0.85rem'
+                          }}
+                        >
+                          ✕ Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleStartEditPrices(selectedTest.id)}
+                        style={{
+                          padding: '6px 16px',
+                          backgroundColor: '#3498db',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                          fontSize: '0.85rem'
+                        }}
+                      >
+                        ✏️ Edit Prices
+                      </button>
+                    )}
+                  </div>
 
                   <div className="pricing-table">
                     <div className="pricing-header">
@@ -1437,16 +1530,37 @@ const LabTests = () => {
                               )}
                             </div>
                             <div className="price-container">
-                              <div className="price">{formatPrice(rate.price)}</div>
-                              {rate.sample_count && rate.sample_count > 0 ? (
-                                <div className="rate-total-cost">
-                                  ${(rate.sample_count * rate.price).toLocaleString('en-US', {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2
-                                  })}
-                                </div>
+                              {editingTestId === selectedTest.id ? (
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={editedPrices[rate.id] !== undefined ? editedPrices[rate.id] : rate.price}
+                                  onChange={(e) => setEditedPrices(prev => ({ ...prev, [rate.id]: e.target.value }))}
+                                  style={{
+                                    width: '90px',
+                                    padding: '4px 8px',
+                                    border: '2px solid #3498db',
+                                    borderRadius: '4px',
+                                    fontSize: '0.9rem',
+                                    fontWeight: 600
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
                               ) : (
-                                <div className="rate-total-cost">$0.00</div>
+                                <>
+                                  <div className="price">{formatPrice(rate.price)}</div>
+                                  {rate.sample_count && rate.sample_count > 0 ? (
+                                    <div className="rate-total-cost">
+                                      ${(rate.sample_count * rate.price).toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2
+                                      })}
+                                    </div>
+                                  ) : (
+                                    <div className="rate-total-cost">$0.00</div>
+                                  )}
+                                </>
                               )}
                             </div>
                             <div className="total-cost">
@@ -1468,6 +1582,90 @@ const LabTests = () => {
                           </div>
                         );
                       })}
+                  </div>
+
+                  {/* Rate Update History Toggle */}
+                  <div style={{ marginTop: '12px' }}>
+                    <button
+                      onClick={async () => {
+                        if (!showHistory) {
+                          setHistoryLoading(true);
+                          const historyMap = {};
+                          if (selectedTest.rates) {
+                            for (const rate of selectedTest.rates) {
+                              const h = await labFeesAPI.getRateHistory(rate.id);
+                              if (h.length > 0) historyMap[rate.id] = h;
+                            }
+                          }
+                          setRateHistory(historyMap);
+                          setHistoryLoading(false);
+                        }
+                        setShowHistory(!showHistory);
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#7f8c8d',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        padding: '4px 0',
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      {showHistory ? '▾ Hide Update History' : '▸ Show Update History'}
+                    </button>
+
+                    {showHistory && (
+                      <div style={{
+                        marginTop: '8px',
+                        padding: '12px',
+                        backgroundColor: '#f9f9f9',
+                        borderRadius: '6px',
+                        border: '1px solid #eee',
+                        fontSize: '0.8rem',
+                        color: '#555'
+                      }}>
+                        {historyLoading ? (
+                          <div>Loading history...</div>
+                        ) : Object.keys(rateHistory).length === 0 ? (
+                          <div style={{ fontStyle: 'italic', color: '#999' }}>No price changes recorded yet.</div>
+                        ) : (
+                          selectedTest.rates
+                            .filter(rate => rateHistory[rate.id])
+                            .map(rate => {
+                              const turnTimeStr = typeof rate.turn_time === 'string' ? rate.turn_time : rate.turn_time?.label || 'unknown';
+                              return (
+                                <div key={rate.id} style={{ marginBottom: '8px' }}>
+                                  <div style={{ fontWeight: 600, marginBottom: '4px', color: '#333' }}>
+                                    {turnTimeStr}
+                                  </div>
+                                  {rateHistory[rate.id].map(entry => (
+                                    <div key={entry.id} style={{
+                                      display: 'flex',
+                                      gap: '12px',
+                                      padding: '2px 0',
+                                      alignItems: 'center'
+                                    }}>
+                                      <span style={{ color: '#999', minWidth: '120px' }}>
+                                        {new Date(entry.changed_at).toLocaleDateString('en-US', {
+                                          month: 'short', day: 'numeric', year: 'numeric'
+                                        })}
+                                      </span>
+                                      <span style={{ color: '#e74c3c', textDecoration: 'line-through' }}>
+                                        ${entry.old_price.toFixed(2)}
+                                      </span>
+                                      <span>→</span>
+                                      <span style={{ color: '#27ae60', fontWeight: 600 }}>
+                                        ${entry.new_price.toFixed(2)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

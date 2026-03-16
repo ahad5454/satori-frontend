@@ -229,6 +229,28 @@ export const labFeesAPI = {
     }
   },
 
+  // Update an existing rate's price
+  updateRate: async (rateId, data) => {
+    try {
+      const response = await api.put(`/lab-fees/rates/${rateId}`, data);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating rate:', error);
+      throw error;
+    }
+  },
+
+  // Get price change history for a rate
+  getRateHistory: async (rateId) => {
+    try {
+      const response = await api.get(`/lab-fees/rates/${rateId}/history`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching rate history:', error);
+      return []; // Return empty array on error to avoid UI crashes
+    }
+  },
+
   // Get labor rates for staff role selection
   getLaborRates: async () => {
     try {
