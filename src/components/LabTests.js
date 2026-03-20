@@ -1049,9 +1049,49 @@ const LabTests = () => {
       }
       setEditingTestId(null);
       setEditedPrices({});
-      // Refresh categories to pick up updated prices
+      setShowHistory(false);
+
+      // Refresh categories but preserve current selection
       if (selectedLab) {
-        await fetchCategoriesForLab(selectedLab.id);
+        const savedCategoryId = selectedCategory?.id;
+        const savedTestId = selectedTest?.id;
+
+        try {
+          const categoriesData = await labFeesAPI.getCategories(selectedLab.id);
+          const categoriesWithTests = await Promise.all(
+            categoriesData.map(async (category) => {
+              const tests = await labFeesAPI.getTests(category.id);
+              const testsWithRates = await Promise.all(
+                tests.map(async (test) => {
+                  const rates = await labFeesAPI.getRates(test.id);
+                  return {
+                    ...test,
+                    rates: rates.map(rate => ({
+                      ...rate,
+                      turn_time: rate.turn_time.label,
+                      hours: rate.turn_time.hours,
+                      sample_count: null
+                    }))
+                  };
+                })
+              );
+              return { ...category, tests: testsWithRates };
+            })
+          );
+
+          setCategories(categoriesWithTests);
+
+          // Re-select the same category and test the user was on
+          const restoredCategory = categoriesWithTests.find(c => c.id === savedCategoryId);
+          if (restoredCategory) {
+            setSelectedCategory(restoredCategory);
+            const restoredTest = restoredCategory.tests?.find(t => t.id === savedTestId);
+            setSelectedTest(restoredTest || null);
+          }
+        } catch (refreshErr) {
+          // Don't nuke the page on a transient refresh error — prices are already saved
+          console.error('Error refreshing categories after price save:', refreshErr);
+        }
       }
     } catch (error) {
       alert('Error saving prices: ' + (error.response?.data?.detail || error.message));
