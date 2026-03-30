@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useProject } from '../contexts/ProjectContext';
-import { logisticsAPI, estimateSnapshotAPI } from '../services/api';
+import { logisticsAPI, estimateSnapshotAPI, userManagementAPI } from '../services/api';
 import DrivingSection from './DrivingSection';
 import FlightsSection from './FlightsSection';
 import RentalSection from './RentalSection';
@@ -22,6 +22,11 @@ const Logistics = () => {
   const [useClientVehicle, setUseClientVehicle] = useState(false);
   const [staffRows, setStaffRows] = useState([{ role: '', count: 0 }]);
   const [perDiemRate, setPerDiemRate] = useState(50); // Default to $50 On-Road
+
+  // Dynamic defaults from admin settings
+  const [perDiemOnRoad, setPerDiemOnRoad] = useState(50);
+  const [perDiemOffRoad, setPerDiemOffRoad] = useState(60);
+  const [defaultAnchorageFee, setDefaultAnchorageFee] = useState(45);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -117,6 +122,24 @@ const Logistics = () => {
       }
     };
     fetchLaborRates();
+
+    // Fetch logistics settings (per diem defaults, Anchorage fee)
+    const fetchLogisticsSettings = async () => {
+      try {
+        const settings = await userManagementAPI.getLogisticsSettings();
+        const onRoad = parseFloat(settings.per_diem_on_road) || 50;
+        const offRoad = parseFloat(settings.per_diem_off_road) || 60;
+        const ancFee = parseFloat(settings.anchorage_flat_fee) || 45;
+        setPerDiemOnRoad(onRoad);
+        setPerDiemOffRoad(offRoad);
+        setDefaultAnchorageFee(ancFee);
+        setPerDiemRate(onRoad); // Set initial per diem to on-road default
+        setRoundtripDrivingData(prev => ({ ...prev, anchorage_flat_fee: ancFee }));
+      } catch (err) {
+        console.error('Error fetching logistics settings:', err);
+      }
+    };
+    fetchLogisticsSettings();
   }, []);
 
   // Project context is managed by ProjectProvider - no need for localStorage
@@ -602,8 +625,8 @@ const Logistics = () => {
                   onChange={(e) => setPerDiemRate(parseFloat(e.target.value))}
                   className="form-input"
                 >
-                  <option value={50}>$50 On-Road</option>
-                  <option value={60}>$60 Off-Road</option>
+                  <option value={perDiemOnRoad}>${perDiemOnRoad} On-Road</option>
+                  <option value={perDiemOffRoad}>${perDiemOffRoad} Off-Road</option>
                 </select>
               </div>
             </div>

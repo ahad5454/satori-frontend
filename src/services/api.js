@@ -698,6 +698,28 @@ export const userManagementAPI = {
       throw error;
     }
   },
+
+  // Get logistics settings (per diem rates, Anchorage flat fee)
+  getLogisticsSettings: async () => {
+    try {
+      const response = await api.get('/logistics/settings');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching logistics settings:', error);
+      return { per_diem_on_road: '50', per_diem_off_road: '60', anchorage_flat_fee: '45' };
+    }
+  },
+
+  // Update logistics settings
+  updateLogisticsSettings: async (updates) => {
+    try {
+      const response = await api.put('/logistics/settings', updates);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating logistics settings:', error);
+      throw error;
+    }
+  },
 };
 
 // Authentication API

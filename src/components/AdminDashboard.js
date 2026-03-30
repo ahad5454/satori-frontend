@@ -21,6 +21,16 @@ const AdminDashboard = () => {
     const [newRate, setNewRate] = useState({ labor_role: '', hourly_rate: '' });
     const [rateSubmitting, setRateSubmitting] = useState(false);
 
+    // Logistics settings state
+    const [logisticsSettings, setLogisticsSettings] = useState({
+        per_diem_on_road: '50',
+        per_diem_off_road: '60',
+        anchorage_flat_fee: '45'
+    });
+    const [logisticsLoading, setLogisticsLoading] = useState(true);
+    const [logisticsSaving, setLogisticsSaving] = useState(false);
+    const [logisticsMessage, setLogisticsMessage] = useState('');
+
     // Active tab
     const [activeTab, setActiveTab] = useState('users');
 
@@ -36,6 +46,7 @@ const AdminDashboard = () => {
         }
         fetchUsers();
         fetchLaborRates();
+        fetchLogisticsSettings();
     }, [userRole, navigate]);
 
     const fetchUsers = async () => {
@@ -154,6 +165,33 @@ const AdminDashboard = () => {
         }
     };
 
+    const fetchLogisticsSettings = async () => {
+        try {
+            setLogisticsLoading(true);
+            const data = await userManagementAPI.getLogisticsSettings();
+            setLogisticsSettings(data);
+        } catch (err) {
+            console.error('Error fetching logistics settings:', err);
+        } finally {
+            setLogisticsLoading(false);
+        }
+    };
+
+    const handleSaveLogisticsSettings = async () => {
+        try {
+            setLogisticsSaving(true);
+            setLogisticsMessage('');
+            await userManagementAPI.updateLogisticsSettings(logisticsSettings);
+            setLogisticsMessage('Settings saved successfully!');
+            setTimeout(() => setLogisticsMessage(''), 3000);
+        } catch (err) {
+            setLogisticsMessage('Error saving settings. Please try again.');
+            console.error(err);
+        } finally {
+            setLogisticsSaving(false);
+        }
+    };
+
     if (loading && laborRatesLoading) {
         return (
             <div className="admin-dashboard">
@@ -187,6 +225,12 @@ const AdminDashboard = () => {
                     onClick={() => setActiveTab('rates')}
                 >
                     💰 Staff Titles & Billing Rates
+                </button>
+                <button
+                    className={`admin-tab ${activeTab === 'logistics' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('logistics')}
+                >
+                    🚛 Logistics
                 </button>
             </div>
 
@@ -438,6 +482,118 @@ const AdminDashboard = () => {
                             </div>
                         </form>
                     </div>
+                </div>
+            )}
+
+            {/* Logistics Settings Tab */}
+            {activeTab === 'logistics' && (
+                <div className="admin-section">
+                    <div className="section-header-bar">
+                        <h2>Logistics Default Settings</h2>
+                    </div>
+                    <p style={{ color: '#666', marginBottom: '20px', fontSize: '0.9rem' }}>
+                        These values are the default rates used in the Logistics Estimator. Changing them here will update the defaults for all new estimates.
+                    </p>
+
+                    {logisticsLoading ? (
+                        <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>Loading settings...</div>
+                    ) : (
+                        <div style={{ maxWidth: '500px' }}>
+                            <div style={{ marginBottom: '20px' }}>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '6px', color: '#2c3e50' }}>
+                                    Per Diem — On-Road ($ per person per day)
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={logisticsSettings.per_diem_on_road}
+                                    onChange={(e) => setLogisticsSettings(prev => ({ ...prev, per_diem_on_road: e.target.value }))}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 12px',
+                                        border: '2px solid #ddd',
+                                        borderRadius: '6px',
+                                        fontSize: '1rem'
+                                    }}
+                                />
+                            </div>
+
+                            <div style={{ marginBottom: '20px' }}>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '6px', color: '#2c3e50' }}>
+                                    Per Diem — Off-Road ($ per person per day)
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={logisticsSettings.per_diem_off_road}
+                                    onChange={(e) => setLogisticsSettings(prev => ({ ...prev, per_diem_off_road: e.target.value }))}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 12px',
+                                        border: '2px solid #ddd',
+                                        borderRadius: '6px',
+                                        fontSize: '1rem'
+                                    }}
+                                />
+                            </div>
+
+                            <div style={{ marginBottom: '20px' }}>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '6px', color: '#2c3e50' }}>
+                                    Anchorage Flat Fee per Day ($)
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={logisticsSettings.anchorage_flat_fee}
+                                    onChange={(e) => setLogisticsSettings(prev => ({ ...prev, anchorage_flat_fee: e.target.value }))}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 12px',
+                                        border: '2px solid #ddd',
+                                        borderRadius: '6px',
+                                        fontSize: '1rem'
+                                    }}
+                                />
+                                <small style={{ display: 'block', marginTop: '4px', color: '#999', fontSize: '0.8rem' }}>
+                                    Default flat fee applied when a project location is set to Anchorage
+                                </small>
+                            </div>
+
+                            <button
+                                onClick={handleSaveLogisticsSettings}
+                                disabled={logisticsSaving}
+                                style={{
+                                    padding: '10px 28px',
+                                    backgroundColor: '#27ae60',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    cursor: logisticsSaving ? 'not-allowed' : 'pointer',
+                                    fontWeight: 600,
+                                    fontSize: '0.95rem'
+                                }}
+                            >
+                                {logisticsSaving ? 'Saving...' : '✓ Save Settings'}
+                            </button>
+
+                            {logisticsMessage && (
+                                <div style={{
+                                    marginTop: '12px',
+                                    padding: '10px 14px',
+                                    borderRadius: '6px',
+                                    backgroundColor: logisticsMessage.includes('Error') ? '#fdecea' : '#e8f5e9',
+                                    color: logisticsMessage.includes('Error') ? '#c62828' : '#2e7d32',
+                                    fontWeight: 500,
+                                    fontSize: '0.9rem'
+                                }}>
+                                    {logisticsMessage}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             )}
         </div>
