@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useProject } from '../contexts/ProjectContext';
 import { labFeesAPI, estimateSnapshotAPI } from '../services/api';
 import ProjectHeader from './ProjectHeader';
@@ -103,6 +103,11 @@ const LabTests = () => {
   const [rateHistory, setRateHistory] = useState({});
   const [historyLoading, setHistoryLoading] = useState(false);
 
+  // Cross-lab category cache: accumulates categories from ALL visited labs
+  // so that handleSaveOrder and calculateOrderSummary can resolve testName→testId
+  // for quantities entered in any lab, not just the currently active one.
+  const allCategoriesRef = useRef([]);
+
   // Cross-lab cart state
   // Each item: { id, labId, labName, testId, testName, categoryName, turnTime, turnTimeHours, price, quantity }
   const [cart, setCart] = useState([]);
@@ -134,6 +139,7 @@ const LabTests = () => {
         testName: test.name,
         categoryName: category?.name || selectedCategory?.name || '',
         turnTime: turnTimeStr,
+        turnTimeId: rate.turn_time_id, // Store turnTimeId for easy backend mapping
         turnTimeHours: rate.hours,
         price: rate.price,
         quantity: qtyToAdd,
@@ -474,6 +480,11 @@ const LabTests = () => {
                 setDerivedQuantityKeys(new Set());
                 setImportedHrsSnapshotId(null);
               }
+
+              // Rehydrate cart from snapshot.inputs (must be inside this block where `inputs` is in scope)
+              if (inputs.cart_items && Array.isArray(inputs.cart_items)) {
+                setCart(inputs.cart_items);
+              }
             }
 
             // Check HRS data availability (for showing import button)
@@ -582,6 +593,7 @@ const LabTests = () => {
     if (selectedLab) {
       fetchCategoriesForLab(selectedLab.id);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLab]);
 
   const fetchCategoriesForLab = async (labId) => {
@@ -620,6 +632,21 @@ const LabTests = () => {
       console.log('Categories with tests:', categoriesWithTests);
       setCategories(categoriesWithTests);
 
+      // Merge into the cross-lab category cache (allCategoriesRef)
+      // This ensures that tests from previously visited labs remain resolvable
+      // during save/summary even if a different lab is currently active.
+      const existingIds = new Set(allCategoriesRef.current.map(c => c.id));
+      const newEntries = categoriesWithTests.filter(c => !existingIds.has(c.id));
+      if (newEntries.length > 0) {
+        allCategoriesRef.current = [...allCategoriesRef.current, ...newEntries];
+      } else {
+        // Update existing entries with fresh data (prices may have changed)
+        allCategoriesRef.current = allCategoriesRef.current.map(existing => {
+          const updated = categoriesWithTests.find(c => c.id === existing.id);
+          return updated || existing;
+        });
+      }
+
       // Select first category if available
       if (categoriesWithTests.length > 0) {
         setSelectedCategory(categoriesWithTests[0]);
@@ -647,19 +674,10 @@ const LabTests = () => {
     setSelectedLab(lab);
     setSelectedCategory(null);
     setSelectedTest(null);
-    // ROW-LEVEL LOCKING: Only clear quantities for non-derived rows
-    // Preserve derived quantities (they're read-only anyway)
-    setQuantities(prev => {
-      const filtered = {};
-      Object.entries(prev).forEach(([key, value]) => {
-        if (derivedQuantityKeys.has(key)) {
-          // Preserve derived quantities
-          filtered[key] = value;
-        }
-        // Non-derived quantities are cleared when changing lab
-      });
-      return filtered;
-    });
+    // PRESERVE ALL QUANTITIES across lab switches (both derived AND manual).
+    // Quantities are keyed by "testName-turnTime" so there's no conflict between labs.
+    // Previously, non-derived (manual) quantities were cleared here, which caused
+    // Derek's bug: manually added PCB/TCLP entries were lost on lab switch.
     setSelectedTurnTime(null);
   };
 
@@ -678,19 +696,10 @@ const LabTests = () => {
   const handleCategoryChange = (category) => {
     setSelectedCategory(category);
     setSelectedTest(null);
-    // ROW-LEVEL LOCKING: Only clear quantities for non-derived rows
-    // Preserve derived quantities (they're read-only anyway)
-    setQuantities(prev => {
-      const filtered = {};
-      Object.entries(prev).forEach(([key, value]) => {
-        if (derivedQuantityKeys.has(key)) {
-          // Preserve derived quantities
-          filtered[key] = value;
-        }
-        // Non-derived quantities are cleared when changing category
-      });
-      return filtered;
-    });
+    // PRESERVE ALL QUANTITIES across category switches (both derived AND manual).
+    // Quantities are keyed by "testName-turnTime" so there's no conflict between categories.
+    // Previously, non-derived (manual) quantities were cleared here, which caused
+    // Derek's bug: manually added PCB/TCLP entries were lost on category switch.
     setSelectedTurnTime(null);
 
     // If category has tests, select the first one
@@ -749,10 +758,11 @@ const LabTests = () => {
         const testName = key.substring(0, lastDashIndex);
         const turnTime = key.substring(lastDashIndex + 1);
 
-        // Search across ALL categories to find the test
-        // Derived quantities may be in different categories than selectedCategory
+        // Search across ALL categories (including from other labs) to find the test
+        // Uses allCategoriesRef which accumulates categories from every lab visited
+        const searchCategories = allCategoriesRef.current.length > 0 ? allCategoriesRef.current : categories;
         let found = false;
-        for (const category of categories) {
+        for (const category of searchCategories) {
           if (category.tests) {
             for (const test of category.tests) {
               if (test.name === testName && test.rates) {
@@ -868,56 +878,69 @@ const LabTests = () => {
     try {
       calculateStaffCosts(); // Calculate to get staff costs
 
-      // Build order details from cart (cross-lab) or quantities (legacy/HRS)
+      // 2. Build unified order details from BOTH quantities (HRS-imported) and cart (manual additions)
       const orderDetails = {};
 
-      if (cart.length > 0) {
-        // Cart-based: each item has testId, turnTime, quantity, labId
-        cart.forEach(item => {
-          const testId = item.testId.toString();
-          // Use a composite key that includes lab info
-          const key = `${testId}_lab${item.labId}`;
-          if (!orderDetails[key]) {
-            orderDetails[key] = {
-              test_id: item.testId,
-              lab_id: item.labId,
-              lab_name: item.labName,
-              test_name: item.testName,
-              category_name: item.categoryName,
-              turn_time: item.turnTime,
-              quantity: item.quantity,
-              price: item.price,
-            };
-          } else {
-            orderDetails[key].quantity += item.quantity;
-          }
-        });
-      } else {
-        // Fallback: build from quantities (for HRS-derived data)
-        Object.entries(quantities).forEach(([key, quantity]) => {
-          if (quantity > 0) {
-            const lastDashIndex = key.lastIndexOf('-');
-            if (lastDashIndex === -1) return;
-            const testName = key.substring(0, lastDashIndex);
-            const turnTime = key.substring(lastDashIndex + 1);
+      // Helper function to add/increment entries in orderDetails
+      const addEntry = (testId, turnTimeId, qty) => {
+        const tid = testId.toString();
+        const ttid = turnTimeId.toString();
+        if (!orderDetails[tid]) {
+          orderDetails[tid] = {};
+        }
+        orderDetails[tid][ttid] = (orderDetails[tid][ttid] || 0) + parseFloat(qty);
+      };
 
+      // A. Process quantities (primarily used for HRS-imported data)
+      Object.entries(quantities).forEach(([key, quantity]) => {
+        if (quantity > 0) {
+          const lastDashIndex = key.lastIndexOf('-');
+          if (lastDashIndex === -1) return;
+          const testName = key.substring(0, lastDashIndex);
+          const turnTime = key.substring(lastDashIndex + 1);
+
+          // Search ALL categories (cross-lab cache) so tests from other labs are resolved
+          const searchCategories = allCategoriesRef.current.length > 0 ? allCategoriesRef.current : categories;
+          searchCategories.forEach(category => {
+            if (category.tests) {
+              category.tests.forEach(test => {
+                if (test.name === testName && test.rates) {
+                  test.rates.forEach(rate => {
+                    const rateTurnTime = typeof rate.turn_time === 'string'
+                      ? rate.turn_time
+                      : rate.turn_time?.label || 'unknown';
+
+                    if (rateTurnTime === turnTime) {
+                      addEntry(test.id, rate.turn_time_id, quantity);
+                    }
+                  });
+                }
+              });
+            }
+          });
+        }
+      });
+
+      // B. Process cart (for manually added items)
+      // DEDUP: If an item is in both the cart and quantities, the quantities entry (which includes HRS)
+      // takes precedence, and the cart addition is skipped.
+      cart.forEach(item => {
+        if (item.quantity > 0) {
+          // Find the turn_time_id if not present (backward compatibility for old cart items)
+          let ttid = item.turnTimeId;
+
+          if (!ttid) {
+            // Re-find based on testId and turnTime label
             categories.forEach(category => {
               if (category.tests) {
                 category.tests.forEach(test => {
-                  if (test.name === testName && test.rates) {
+                  if (test.id === item.testId && test.rates) {
                     test.rates.forEach(rate => {
                       const rateTurnTime = typeof rate.turn_time === 'string'
                         ? rate.turn_time
                         : rate.turn_time?.label || 'unknown';
-
-                      if (rateTurnTime === turnTime) {
-                        const testId = test.id.toString();
-                        const turnTimeId = rate.turn_time_id?.toString() || '';
-
-                        if (!orderDetails[testId]) {
-                          orderDetails[testId] = {};
-                        }
-                        orderDetails[testId][turnTimeId] = quantity;
+                      if (rateTurnTime === item.turnTime) {
+                        ttid = rate.turn_time_id;
                       }
                     });
                   }
@@ -925,8 +948,23 @@ const LabTests = () => {
               }
             });
           }
-        });
-      }
+
+          if (ttid) {
+            const tid = item.testId.toString();
+            const ttidStr = ttid.toString();
+            // DEDUP: Skip cart entries that already exist in orderDetails (quantities win)
+            if (orderDetails[tid] && orderDetails[tid][ttidStr]) {
+              console.warn(
+                `Dedup: Cart item "${item.testName}" (test ${tid}, turnTime ${ttidStr}) ` +
+                `already exists in quantities with qty=${orderDetails[tid][ttidStr]}. ` +
+                `Skipping cart entry (qty=${item.quantity}) to prevent double-counting.`
+              );
+            } else {
+              addEntry(item.testId, ttid, item.quantity);
+            }
+          }
+        }
+      });
 
       // Build staff assignments
       const staffAssignments = staffRows

@@ -64,60 +64,83 @@ const LabFeesBreakdownDetails = ({ details, inputs, categories = [] }) => {
 
     // order_details format: {"test_id": {"turn_time_id": quantity, ...}, ...}
     Object.entries(orderDetails).forEach(([testIdStr, turnTimes]) => {
-      const testId = parseInt(testIdStr);
+      // Safety: skip if turnTimes is not expected structure
+      if (!turnTimes || typeof turnTimes !== 'object') return;
 
-      Object.entries(turnTimes).forEach(([turnTimeIdStr, quantity]) => {
-        const turnTimeId = parseInt(turnTimeIdStr);
-        const qty = parseFloat(quantity) || 0;
+      // Handle "New Format": {test_id: {turn_time_id: qty}}
+      // Check if values are nested maps (new format) or flat values (old cart format)
+      const firstVal = Object.values(turnTimes)[0];
+      const isNewFormat = typeof firstVal === 'number' || typeof firstVal === 'string';
+      // Wait, let's be more precise.
 
-        if (qty > 0) {
-          // Find test and rate in categories
-          let testName = `Test ID ${testId}`;
-          let turnTimeLabel = `Turnaround ID ${turnTimeId}`;
-          let price = 0;
-          let categoryName = 'Unknown';
-          let labNameFromCategory = '';
+      if (typeof turnTimes === 'object' && !('test_id' in turnTimes)) {
+        // NEW FORMAT: {test_id: {turn_time_id: qty}}
+        const testId = parseInt(testIdStr);
+        Object.entries(turnTimes).forEach(([turnTimeIdStr, quantity]) => {
+          const turnTimeId = parseInt(turnTimeIdStr);
+          const qty = parseFloat(quantity) || 0;
+          if (qty > 0) processEntry(testId, turnTimeId, qty);
+        });
+      } else if (turnTimes.test_id && turnTimes.quantity) {
+        // OLD CART FORMAT: {key: {test_id, turn_time, quantity, price, ...}}
+        const item = turnTimes;
+        breakdown.push({
+          labName: item.lab_name || '',
+          categoryName: item.category_name || 'Unknown',
+          testName: item.test_name || `Test ID ${item.test_id}`,
+          turnTime: item.turn_time || 'Unknown',
+          quantity: parseFloat(item.quantity) || 0,
+          price: parseFloat(item.price) || 0,
+          cost: (parseFloat(item.quantity) || 0) * (parseFloat(item.price) || 0)
+        });
+      }
+    });
 
-          for (const category of categories) {
-            if (category.tests) {
-              for (const test of category.tests) {
-                if (test.id === testId && test.rates) {
-                  testName = test.name;
-                  categoryName = category.name;
-                  labNameFromCategory = category.labName || '';
+    function processEntry(testId, turnTimeId, qty) {
+      // Find test and rate in categories
+      let testName = `Test ID ${testId}`;
+      let turnTimeLabel = `Turnaround ID ${turnTimeId}`;
+      let price = 0;
+      let categoryName = 'Unknown';
+      let labNameFromCategory = '';
 
-                  for (const rate of test.rates) {
-                    const rateTurnTimeId = typeof rate.turn_time === 'object'
-                      ? rate.turn_time?.id
-                      : rate.turn_time_id;
+      for (const category of categories) {
+        if (category.tests) {
+          for (const test of category.tests) {
+            if (test.id === testId && test.rates) {
+              testName = test.name;
+              categoryName = category.name;
+              labNameFromCategory = category.labName || '';
 
-                    if (rateTurnTimeId === turnTimeId) {
-                      price = rate.price || 0;
-                      turnTimeLabel = typeof rate.turn_time === 'object'
-                        ? rate.turn_time?.label || `Turnaround ID ${turnTimeId}`
-                        : `Turnaround ID ${turnTimeId}`;
-                      break;
-                    }
-                  }
+              for (const rate of test.rates) {
+                const rateTurnTimeId = typeof rate.turn_time === 'object'
+                  ? rate.turn_time?.id
+                  : rate.turn_time_id;
+
+                if (rateTurnTimeId === turnTimeId) {
+                  price = rate.price || 0;
+                  turnTimeLabel = typeof rate.turn_time === 'object'
+                    ? rate.turn_time?.label || `Turnaround ID ${turnTimeId}`
+                    : `Turnaround ID ${turnTimeId}`;
                   break;
                 }
               }
+              break;
             }
           }
-
-          const cost = qty * price;
-          breakdown.push({
-            labName: labNameFromCategory || '',
-            categoryName,
-            testName,
-            turnTime: turnTimeLabel,
-            quantity: qty,
-            price,
-            cost
-          });
         }
+      }
+
+      breakdown.push({
+        labName: labNameFromCategory || '',
+        categoryName,
+        testName,
+        turnTime: turnTimeLabel,
+        quantity: qty,
+        price,
+        cost: qty * price
       });
-    });
+    }
 
     return breakdown;
   };

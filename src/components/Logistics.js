@@ -26,7 +26,6 @@ const Logistics = () => {
   // Dynamic defaults from admin settings
   const [perDiemOnRoad, setPerDiemOnRoad] = useState(50);
   const [perDiemOffRoad, setPerDiemOffRoad] = useState(60);
-  const [defaultAnchorageFee, setDefaultAnchorageFee] = useState(45);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -132,7 +131,6 @@ const Logistics = () => {
         const ancFee = parseFloat(settings.anchorage_flat_fee) || 45;
         setPerDiemOnRoad(onRoad);
         setPerDiemOffRoad(offRoad);
-        setDefaultAnchorageFee(ancFee);
         setPerDiemRate(onRoad); // Set initial per diem to on-road default
         setRoundtripDrivingData(prev => ({ ...prev, anchorage_flat_fee: ancFee }));
       } catch (err) {
@@ -158,8 +156,24 @@ const Logistics = () => {
 
       try {
         const snapshot = await estimateSnapshotAPI.getLatestSnapshot(project.name);
+
+        // Check for Lab Fees staff assignments to enable "carry over"
+        let labStaffRows = [];
+        if (snapshot && snapshot.lab_fees_data && snapshot.lab_fees_data.inputs) {
+          const labInputs = snapshot.lab_fees_data.inputs;
+          if (labInputs.staff_assignments && Array.isArray(labInputs.staff_assignments)) {
+            labStaffRows = labInputs.staff_assignments.map(s => ({
+              role: s.role || '',
+              count: s.count || 1
+            }));
+          }
+        }
+
         if (!snapshot || !snapshot.logistics_data) {
-          // No snapshot data available - form stays empty
+          // No logistics data available - but if we have Lab staff, auto-populate it
+          if (labStaffRows.length > 0) {
+            setStaffRows(labStaffRows);
+          }
           return;
         }
 
@@ -185,8 +199,16 @@ const Logistics = () => {
         }
 
         // Rehydrate staff rows
-        if (inputs.staff && Array.isArray(inputs.staff) && inputs.staff.length > 0) {
-          setStaffRows(inputs.staff.map(s => ({ role: s.role || '', count: s.count || 0 })));
+        const savedStaff = inputs.staff;
+        const hasValidSavedStaff = savedStaff && Array.isArray(savedStaff) && savedStaff.some(s => s.role && s.role.trim() !== '');
+
+        if (hasValidSavedStaff) {
+          setStaffRows(savedStaff.map(s => ({ role: s.role || '', count: s.count || 0 })));
+        } else if (labStaffRows.length > 0) {
+          // Logistics data exists but staff is empty or just placeholder rows — auto-fill from Lab staff assignments
+          setStaffRows(labStaffRows);
+        } else if (savedStaff && Array.isArray(savedStaff) && savedStaff.length > 0) {
+          setStaffRows(savedStaff.map(s => ({ role: s.role || '', count: s.count || 0 })));
         }
 
         // Rehydrate driving data
@@ -586,21 +608,67 @@ const Logistics = () => {
 
           {/* Rate Multiplier */}
           <div className="form-section">
-            <div className="form-group">
-              <label htmlFor="rate-multiplier">Rate Multiplier (%)</label>
-              <select
-                id="rate-multiplier"
-                value={rateMultiplier}
-                onChange={(e) => setRateMultiplier(parseFloat(e.target.value))}
-                className="form-input"
-              >
-                <option value={1.0}>100%</option>
-                <option value={0.75}>75%</option>
-                <option value={0.5}>50%</option>
-              </select>
-              <small style={{ fontSize: '0.8rem', color: '#666', marginTop: '4px', display: 'block' }}>
-                Applied to all staff labor costs
-              </small>
+            <div className="form-group" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ flex: 1 }}>
+                <label htmlFor="rate-multiplier">Rate Multiplier (%)</label>
+                <select
+                  id="rate-multiplier"
+                  value={rateMultiplier}
+                  onChange={(e) => setRateMultiplier(parseFloat(e.target.value))}
+                  className="form-input"
+                >
+                  <option value={1.0}>100%</option>
+                  <option value={0.75}>75%</option>
+                  <option value={0.5}>50%</option>
+                </select>
+                <small style={{ fontSize: '0.8rem', color: '#666', marginTop: '4px', display: 'block' }}>
+                  Applied to all staff labor costs
+                </small>
+              </div>
+
+              <div className="import-actions" style={{ marginLeft: '20px' }}>
+                <button
+                  type="button"
+                  className="secondary-action-btn"
+                  onClick={async () => {
+                    try {
+                      const snapshot = await estimateSnapshotAPI.getLatestSnapshot(project.name);
+                      if (snapshot?.lab_fees_data?.inputs?.staff_assignments) {
+                        const labStaff = snapshot.lab_fees_data.inputs.staff_assignments.map(s => ({
+                          role: s.role || '',
+                          count: s.count || 1
+                        }));
+                        if (labStaff.length > 0) {
+                          setStaffRows(labStaff);
+                          alert('Staff assignments imported from Lab Fees successfully.');
+                        } else {
+                          alert('No staff assignments found in Lab Fees.');
+                        }
+                      } else {
+                        alert('No Lab Fees data found for this project.');
+                      }
+                    } catch (err) {
+                      console.error('Error importing staff:', err);
+                      alert('Failed to import staff from Lab Fees.');
+                    }
+                  }}
+                  title="Copy staff roles and counts from Lab module"
+                  style={{
+                    padding: '8px 12px',
+                    backgroundColor: '#f8f9fa',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    color: '#495057',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <span>📋</span> Import Staff from Lab
+                </button>
+              </div>
             </div>
           </div>
 
