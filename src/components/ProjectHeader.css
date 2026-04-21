@@ -5,8 +5,7 @@
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border-color);
   overflow: hidden;
-  margin-top: -24px;
-  /* Pull up to sit under main nav if needed, or just standard spacing */
+  margin-top: 0;
 }
 
 .project-name-banner {

@@ -89,6 +89,19 @@ const Home = () => {
               </button>
 
               <button
+                onClick={() => handleModuleClick('/equipment')}
+                className="module-card"
+              >
+                <div className="module-icon-container" style={{ background: 'linear-gradient(135deg, #667eea, #764ba2)' }}>
+                  <span className="module-initial">E</span>
+                </div>
+                <div className="module-content">
+                  <h3>Equipment</h3>
+                  <p>Field equipment costs</p>
+                </div>
+              </button>
+
+              <button
                 onClick={() => handleModuleClick('/logistics')}
                 className="module-card"
               >
@@ -225,6 +238,12 @@ const Home = () => {
               className="cta-button primary"
             >
               Lab Fee Calculator
+            </button>
+            <button
+              onClick={() => handleModuleClick('/equipment')}
+              className="cta-button primary"
+            >
+              Equipment
             </button>
             <button
               onClick={() => handleModuleClick('/logistics')}

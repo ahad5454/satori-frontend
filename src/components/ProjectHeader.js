@@ -91,6 +91,12 @@ const ProjectHeader = ({ projectName, moduleName, onProjectNameChange }) => {
           Lab Fee Calculator
         </button>
         <button
+          className={`nav-module-btn ${moduleName === 'equipment' ? 'active' : ''}`}
+          onClick={() => navigate('/equipment')}
+        >
+          Equipment
+        </button>
+        <button
           className={`nav-module-btn ${moduleName === 'logistics' ? 'active' : ''}`}
           onClick={() => navigate('/logistics')}
         >

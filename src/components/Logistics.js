@@ -47,8 +47,6 @@ const Logistics = () => {
     }));
   };
 
-  // Rate multiplier state
-  const [rateMultiplier, setRateMultiplier] = useState(1.0);
 
   // Roundtrip driving state (for site_access_mode === "driving")
   const [roundtripDrivingData, setRoundtripDrivingData] = useState({
@@ -193,9 +191,6 @@ const Logistics = () => {
         }
         if (inputs.per_diem_rate !== undefined) {
           setPerDiemRate(inputs.per_diem_rate);
-        }
-        if (inputs.rate_multiplier !== undefined) {
-          setRateMultiplier(inputs.rate_multiplier);
         }
 
         // Rehydrate staff rows
@@ -344,10 +339,6 @@ const Logistics = () => {
         }
       }
 
-      // Load rate multiplier if present
-      if (estimation.rate_multiplier !== undefined && estimation.rate_multiplier !== null) {
-        setRateMultiplier(estimation.rate_multiplier);
-      }
       if (estimation.flights_input) {
         setFlightsData(estimation.flights_input);
       }
@@ -448,7 +439,6 @@ const Logistics = () => {
         professional_role: null, // legacy
         num_staff: totalStaff, // legacy
         per_diem_rate: parseFloat(perDiemRate) || 0.0,
-        rate_multiplier: parseFloat(rateMultiplier) || 1.0,
         // Send staff array (new preferred format)
         staff: staffArray.length > 0 ? staffArray : undefined,
         roundtrip_driving: roundtripDriving,
@@ -606,71 +596,6 @@ const Logistics = () => {
             </div>
           )}
 
-          {/* Rate Multiplier */}
-          <div className="form-section">
-            <div className="form-group" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ flex: 1 }}>
-                <label htmlFor="rate-multiplier">Rate Multiplier (%)</label>
-                <select
-                  id="rate-multiplier"
-                  value={rateMultiplier}
-                  onChange={(e) => setRateMultiplier(parseFloat(e.target.value))}
-                  className="form-input"
-                >
-                  <option value={1.0}>100%</option>
-                  <option value={0.75}>75%</option>
-                  <option value={0.5}>50%</option>
-                </select>
-                <small style={{ fontSize: '0.8rem', color: '#666', marginTop: '4px', display: 'block' }}>
-                  Applied to all staff labor costs
-                </small>
-              </div>
-
-              <div className="import-actions" style={{ marginLeft: '20px' }}>
-                <button
-                  type="button"
-                  className="secondary-action-btn"
-                  onClick={async () => {
-                    try {
-                      const snapshot = await estimateSnapshotAPI.getLatestSnapshot(project.name);
-                      if (snapshot?.lab_fees_data?.inputs?.staff_assignments) {
-                        const labStaff = snapshot.lab_fees_data.inputs.staff_assignments.map(s => ({
-                          role: s.role || '',
-                          count: s.count || 1
-                        }));
-                        if (labStaff.length > 0) {
-                          setStaffRows(labStaff);
-                          alert('Staff assignments imported from Lab Fees successfully.');
-                        } else {
-                          alert('No staff assignments found in Lab Fees.');
-                        }
-                      } else {
-                        alert('No Lab Fees data found for this project.');
-                      }
-                    } catch (err) {
-                      console.error('Error importing staff:', err);
-                      alert('Failed to import staff from Lab Fees.');
-                    }
-                  }}
-                  title="Copy staff roles and counts from Lab module"
-                  style={{
-                    padding: '8px 12px',
-                    backgroundColor: '#f8f9fa',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '0.9rem',
-                    color: '#495057',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <span>📋</span> Import Staff from Lab
-                </button>
-              </div>
-            </div>
-          </div>
 
           {/* Staff Rows */}
           <div className="form-section">

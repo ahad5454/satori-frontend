@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { userManagementAPI } from '../services/api';
+import { userManagementAPI, labSettingsAPI } from '../services/api';
 import './AdminDashboard.css';
 
 const AdminDashboard = () => {
@@ -31,6 +31,12 @@ const AdminDashboard = () => {
     const [logisticsSaving, setLogisticsSaving] = useState(false);
     const [logisticsMessage, setLogisticsMessage] = useState('');
 
+    // Lab settings state
+    const [labSettings, setLabSettings] = useState({ lab_markup_default: '50' });
+    const [labSettingsLoading, setLabSettingsLoading] = useState(true);
+    const [labSettingsSaving, setLabSettingsSaving] = useState(false);
+    const [labSettingsMessage, setLabSettingsMessage] = useState('');
+
     // Active tab
     const [activeTab, setActiveTab] = useState('users');
 
@@ -47,6 +53,7 @@ const AdminDashboard = () => {
         fetchUsers();
         fetchLaborRates();
         fetchLogisticsSettings();
+        fetchLabSettingsData();
     }, [userRole, navigate]);
 
     const fetchUsers = async () => {
@@ -192,6 +199,33 @@ const AdminDashboard = () => {
         }
     };
 
+    const fetchLabSettingsData = async () => {
+        try {
+            setLabSettingsLoading(true);
+            const data = await labSettingsAPI.getSettings();
+            setLabSettings(data);
+        } catch (err) {
+            console.error('Error fetching lab settings:', err);
+        } finally {
+            setLabSettingsLoading(false);
+        }
+    };
+
+    const handleSaveLabSettings = async () => {
+        try {
+            setLabSettingsSaving(true);
+            setLabSettingsMessage('');
+            await labSettingsAPI.updateSettings(labSettings);
+            setLabSettingsMessage('Lab settings saved successfully!');
+            setTimeout(() => setLabSettingsMessage(''), 3000);
+        } catch (err) {
+            setLabSettingsMessage('Error saving lab settings. Please try again.');
+            console.error(err);
+        } finally {
+            setLabSettingsSaving(false);
+        }
+    };
+
     if (loading && laborRatesLoading) {
         return (
             <div className="admin-dashboard">
@@ -231,6 +265,12 @@ const AdminDashboard = () => {
                     onClick={() => setActiveTab('logistics')}
                 >
                     🚛 Logistics
+                </button>
+                <button
+                    className={`admin-tab ${activeTab === 'lab_settings' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('lab_settings')}
+                >
+                    🔬 Lab Settings
                 </button>
             </div>
 
@@ -590,6 +630,72 @@ const AdminDashboard = () => {
                                     fontSize: '0.9rem'
                                 }}>
                                     {logisticsMessage}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Lab Settings Tab */}
+            {activeTab === 'lab_settings' && (
+                <div className="admin-section">
+                    <div className="section-header-bar">
+                        <h2>Lab Settings</h2>
+                    </div>
+                    <p style={{ color: '#666', marginBottom: '20px', fontSize: '0.9rem' }}>
+                        Configure default values for the Lab Fee Calculator. Users can override these on a per-project basis.
+                    </p>
+
+                    {labSettingsLoading ? (
+                        <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>Loading settings...</div>
+                    ) : (
+                        <div style={{ maxWidth: '500px' }}>
+                            <div style={{ marginBottom: '20px' }}>
+                                <label style={{ display: 'block', fontWeight: 600, marginBottom: '6px', color: '#2c3e50' }}>
+                                    Default Lab Markup (%)
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.5"
+                                    min="0"
+                                    value={labSettings.lab_markup_default}
+                                    onChange={(e) => setLabSettings(prev => ({ ...prev, lab_markup_default: e.target.value }))}
+                                    style={{ width: '100%', padding: '10px 12px', border: '2px solid #ddd', borderRadius: '6px', fontSize: '1rem' }}
+                                />
+                                <small style={{ display: 'block', marginTop: '4px', color: '#999', fontSize: '0.8rem' }}>
+                                    Applied as the default markup when generating a lab fees estimate. Users may change this per project.
+                                </small>
+                            </div>
+
+                            <button
+                                onClick={handleSaveLabSettings}
+                                disabled={labSettingsSaving}
+                                style={{
+                                    padding: '10px 28px',
+                                    backgroundColor: '#27ae60',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    cursor: labSettingsSaving ? 'not-allowed' : 'pointer',
+                                    fontWeight: 600,
+                                    fontSize: '0.95rem'
+                                }}
+                            >
+                                {labSettingsSaving ? 'Saving...' : '✓ Save Lab Settings'}
+                            </button>
+
+                            {labSettingsMessage && (
+                                <div style={{
+                                    marginTop: '12px',
+                                    padding: '10px 14px',
+                                    borderRadius: '6px',
+                                    backgroundColor: labSettingsMessage.includes('Error') ? '#fdecea' : '#e8f5e9',
+                                    color: labSettingsMessage.includes('Error') ? '#c62828' : '#2e7d32',
+                                    fontWeight: 500,
+                                    fontSize: '0.9rem'
+                                }}>
+                                    {labSettingsMessage}
                                 </div>
                             )}
                         </div>

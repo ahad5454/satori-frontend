@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useProject } from '../contexts/ProjectContext';
-import { labFeesAPI, estimateSnapshotAPI } from '../services/api';
+import { labFeesAPI, estimateSnapshotAPI, labSettingsAPI } from '../services/api';
+
 import ProjectHeader from './ProjectHeader';
 import LabFeesBreakdownDetails from './LabFeesBreakdownDetails';
 import './LabTests.css';
@@ -107,6 +108,12 @@ const LabTests = () => {
   // so that handleSaveOrder and calculateOrderSummary can resolve testName→testId
   // for quantities entered in any lab, not just the currently active one.
   const allCategoriesRef = useRef([]);
+
+  // PLM Layer Multiplier — editable per project, default 0.715
+  const [plmLayerMultiplier, setPlmLayerMultiplier] = useState(0.715);
+
+  // Lab Markup Percent — fetched from admin defaults, editable per project
+  const [labMarkupPercent, setLabMarkupPercent] = useState(50);
 
   // Cross-lab cart state
   // Each item: { id, labId, labName, testId, testName, categoryName, turnTime, turnTimeHours, price, quantity }
@@ -415,6 +422,14 @@ const LabTests = () => {
                 setHrsEstimationId(inputs.hrs_estimation_id);
               }
 
+              // Rehydrate PLM multiplier and lab markup % per project
+              if (inputs.plm_layer_multiplier !== undefined) {
+                setPlmLayerMultiplier(parseFloat(inputs.plm_layer_multiplier));
+              }
+              if (inputs.lab_markup_percent !== undefined) {
+                setLabMarkupPercent(parseFloat(inputs.lab_markup_percent));
+              }
+
               // Rehydrate quantities from saved order_details
               // CRITICAL: Only use snapshot.inputs for rehydration - never use snapshot.outputs.hrs_estimator
               // HRS outputs are ONLY used when user explicitly clicks "Import HRS Sample Data"
@@ -556,6 +571,19 @@ const LabTests = () => {
       }
     };
     fetchReferenceData();
+
+    // Fetch admin lab settings for defaults (markup %)
+    const fetchLabSettings = async () => {
+      try {
+        const settings = await labSettingsAPI.getSettings();
+        if (settings?.lab_markup_default !== undefined) {
+          setLabMarkupPercent(parseFloat(settings.lab_markup_default));
+        }
+      } catch (err) {
+        console.warn('Could not fetch lab settings, using default markup:', err);
+      }
+    };
+    fetchLabSettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -984,6 +1012,8 @@ const LabTests = () => {
         quantities_imported_from_hrs: derivedQuantityKeys.size > 0,
         imported_hrs_snapshot_id: importedHrsSnapshotId,
         cart_items: cart, // Store full cart for rehydration
+        plm_layer_multiplier: plmLayerMultiplier,
+        lab_markup_percent: labMarkupPercent,
       };
 
       const result = await labFeesAPI.createOrder(orderData);
@@ -1750,86 +1780,226 @@ const LabTests = () => {
             </>
           )}
         </div>
-      </div>
 
-      {/* Cart-Based Order Summary */}
-      {cart.length > 0 && (() => {
-        const grouped = getCartGroupedByLab();
-        const { totalSamples, totalCost } = getCartTotals();
-        return (
-          <div className="order-summary-container">
-            <div className="order-summary-card">
-              <h3>🛒 Estimate Summary</h3>
-              <table className="estimate-table">
-                <thead>
-                  <tr>
-                    <th>Lab</th>
-                    <th>Test</th>
-                    <th>Turnaround</th>
-                    <th>Qty</th>
-                    <th>Price</th>
-                    <th>Total</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(grouped).map(([labName, items]) => {
-                    const labTotal = items.reduce((sum, item) => sum + item.quantity * item.price, 0);
-                    return (
-                      <React.Fragment key={labName}>
-                        {items.map((item, idx) => (
-                          <tr key={item.id} className="estimate-row">
-                            {idx === 0 ? (
-                              <td rowSpan={items.length} className="estimate-lab-cell">
-                                <span className="estimate-lab-name">🔬 {labName}</span>
-                              </td>
-                            ) : null}
-                            <td>
-                              <div className="estimate-test-name">{item.testName}</div>
-                              <div className="estimate-category">{item.categoryName}</div>
-                            </td>
-                            <td className="estimate-turnaround">{item.turnTime}</td>
-                            <td className="estimate-qty-cell">
-                              <div className="estimate-qty-controls">
-                                <button className="quantity-btn" onClick={() => updateCartQuantity(item.id, item.quantity - 1)}>−</button>
-                                <span className="estimate-qty-value">{item.quantity}</span>
-                                <button className="quantity-btn" onClick={() => updateCartQuantity(item.id, item.quantity + 1)}>+</button>
-                              </div>
-                            </td>
-                            <td className="estimate-price">{formatPrice(item.price)}</td>
-                            <td className="estimate-total">{formatPrice(item.quantity * item.price)}</td>
-                            <td>
-                              <button
-                                onClick={() => removeFromCart(item.id)}
-                                className="estimate-remove-btn"
-                                title="Remove from estimate"
-                              >✕</button>
-                            </td>
-                          </tr>
-                        ))}
-                        <tr className="estimate-subtotal-row">
-                          <td colSpan="5" style={{ textAlign: 'right', fontWeight: '700' }}>Lab Subtotal:</td>
-                          <td className="estimate-total" style={{ fontWeight: '700' }}>{formatPrice(labTotal)}</td>
-                          <td></td>
-                        </tr>
-                      </React.Fragment>
-                    );
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr className="estimate-grand-total-row">
-                    <td colSpan="3" style={{ textAlign: 'right', fontWeight: '800' }}>Grand Total</td>
-                    <td style={{ fontWeight: '700', textAlign: 'center' }}>{totalSamples}</td>
-                    <td></td>
-                    <td className="estimate-grand-total">{formatPrice(totalCost)}</td>
-                    <td></td>
-                  </tr>
-                </tfoot>
-              </table>
+        {/* RIGHT SIDEBAR: Cart and Grand Total Summary */}
+        <div className="summary-sidebar">
+          {/* Placeholder for empty sidebar */}
+          {cart.length === 0 && calculateOrderSummary().totalSamples === 0 && (
+            <div className="sidebar-placeholder">
+              <div className="placeholder-card">
+                <div className="placeholder-icon">📋</div>
+                <h3>Estimate Details</h3>
+                <p>Select a laboratory and add test quantities to see your project estimate here.</p>
+                <div className="placeholder-steps">
+                  <div className="step-item">
+                    <span className="step-number">1</span>
+                    <span>Choose a lab on the left</span>
+                  </div>
+                  <div className="step-item">
+                    <span className="step-number">2</span>
+                    <span>Browse service categories</span>
+                  </div>
+                  <div className="step-item">
+                    <span className="step-number">3</span>
+                    <span>Add test quantities</span>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        );
-      })()}
+          )}
+
+          {/* Cart-Based Order Summary */}
+          {cart.length > 0 && (() => {
+            const grouped = getCartGroupedByLab();
+            const { totalSamples, totalCost } = getCartTotals();
+            return (
+              <div className="order-summary-container">
+                <div className="order-summary-card">
+                  <h3>🛒 Estimate Summary</h3>
+                  <table className="estimate-table">
+                    <thead>
+                      <tr>
+                        <th>Test</th>
+                        <th>Qty</th>
+                        <th>Total</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(grouped).map(([labName, items]) => {
+                        return (
+                          <React.Fragment key={labName}>
+                            <tr className="lab-group-header">
+                              <td colSpan="4">🔬 {labName}</td>
+                            </tr>
+                            {items.map((item) => (
+                              <tr key={item.id} className="estimate-row">
+                                <td>
+                                  <div className="estimate-test-name">{item.testName}</div>
+                                  <div className="estimate-category">{item.categoryName}</div>
+                                </td>
+                                <td className="estimate-qty-cell">
+                                  <div className="estimate-qty-controls">
+                                    <button className="quantity-btn" onClick={() => updateCartQuantity(item.id, item.quantity - 1)}>−</button>
+                                    <span className="estimate-qty-value">{item.quantity}</span>
+                                    <button className="quantity-btn" onClick={() => updateCartQuantity(item.id, item.quantity + 1)}>+</button>
+                                  </div>
+                                </td>
+                                <td className="estimate-total">{formatPrice(item.quantity * item.price)}</td>
+                                <td>
+                                  <button
+                                    onClick={() => removeFromCart(item.id)}
+                                    className="estimate-remove-btn"
+                                    title="Remove from estimate"
+                                  >✕</button>
+                                </td>
+                              </tr>
+                            ))}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="estimate-grand-total-row">
+                        <td style={{ textAlign: 'right', fontWeight: '800' }}>Cart Subtotal</td>
+                        <td style={{ fontWeight: '700', textAlign: 'center' }}>{totalSamples}</td>
+                        <td className="estimate-grand-total">{formatPrice(totalCost)}</td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Grand Total - Based on sample_count and/or cart */}
+          {(() => {
+            const { totalSamples, totalCost, breakdown } = calculateOrderSummary();
+            const { totalCost: staffCost, breakdown: staffBreakdown } = calculateStaffCosts();
+            const { totalSamples: cartSamples, totalCost: cartCost } = getCartTotals();
+            const combinedSamples = totalSamples + cartSamples;
+            const combinedLabCost = totalCost + cartCost;
+
+            // PLM layer check
+            const PLM_KEYWORD = 'PLM';
+            let plmQty = 0;
+            let plmUnitPrice = 0;
+            const allCats = allCategoriesRef.current.length > 0 ? allCategoriesRef.current : categories;
+            Object.entries(quantities).forEach(([key, qty]) => {
+              if (qty <= 0) return;
+              const lastDash = key.lastIndexOf('-');
+              if (lastDash === -1) return;
+              const testName = key.substring(0, lastDash);
+              const turnTime = key.substring(lastDash + 1);
+              allCats.forEach(cat => {
+                if (!cat.name.toUpperCase().includes(PLM_KEYWORD)) return;
+                (cat.tests || []).forEach(t => {
+                  if (t.name !== testName) return;
+                  (t.rates || []).forEach(r => {
+                    const rt = typeof r.turn_time === 'string' ? r.turn_time : r.turn_time?.label || '';
+                    if (rt === turnTime) {
+                      plmQty += parseFloat(qty);
+                      if (!plmUnitPrice) plmUnitPrice = r.price || 0;
+                    }
+                  });
+                });
+              });
+            });
+            cart.forEach(item => {
+              if (!item.categoryName?.toUpperCase().includes(PLM_KEYWORD)) return;
+              plmQty += item.quantity || 0;
+              if (!plmUnitPrice) plmUnitPrice = item.price || 0;
+            });
+
+            const hasPLM = plmQty > 0;
+            const plmLayerSamples = hasPLM ? Math.ceil(plmQty * plmLayerMultiplier) : 0;
+            const plmLayerCost = plmLayerSamples * plmUnitPrice;
+            const subtotalCost = combinedLabCost + staffCost + plmLayerCost;
+            const markupAmount = subtotalCost * (labMarkupPercent / 100);
+            const grandTotal = subtotalCost + markupAmount;
+
+            if (combinedSamples > 0 || combinedLabCost > 0 || staffCost > 0) {
+              return (
+                <div className="order-summary-container grand-total-section">
+                  <div className="order-summary-card">
+                    <h3>Grand Total</h3>
+                    <div className="order-summary-details">
+                      {/* Breakdown by test and turnaround time - simplified for space */}
+                      {breakdown.length > 0 && (
+                        <div className="order-summary-breakdown">
+                          <h4 className="breakdown-title">Combined Breakdown:</h4>
+                          {breakdown.map((item, index) => (
+                            <div key={index} className="breakdown-item">
+                              <div className="breakdown-test-info">
+                                <span className="breakdown-test-name">{item.testName}</span>
+                                <span className="breakdown-turn-time">({item.turnTime})</span>
+                              </div>
+                              <div className="breakdown-values">
+                                <span className="breakdown-samples">
+                                  {item.sampleCount.toLocaleString('en-US')} s.
+                                </span>
+                                <span className="breakdown-cost">
+                                  ${item.cost.toLocaleString('en-US', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2
+                                  })}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Totals Section */}
+                      <div className="order-summary-totals">
+                        <div className="order-summary-item">
+                          <span className="order-summary-label">Samples:</span>
+                          <span className="order-summary-value">{combinedSamples.toLocaleString('en-US')}</span>
+                        </div>
+                        <div className="order-summary-item">
+                          <span className="order-summary-label">Subtotal:</span>
+                          <span className="order-summary-value">
+                            ${subtotalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div className="order-summary-item markup-row">
+                          <span className="order-summary-label">Markup ({labMarkupPercent}%):</span>
+                          <span className="order-summary-value">
+                            + ${markupAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div className="order-summary-item highlight">
+                          <span className="order-summary-label">TOTAL COST:</span>
+                          <span className="order-summary-value order-summary-total">
+                            ${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* PLM notice if applicable */}
+                      {hasPLM && (
+                        <div className="plm-summary-notice">
+                          <span>Includes PLM Layer Fees (${plmLayerCost.toFixed(2)})</span>
+                        </div>
+                      )}
+
+                      <button
+                        className="save-order-btn"
+                        onClick={handleSaveOrder}
+                        disabled={loading}
+                      >
+                        {loading ? 'Saving...' : '💾 Save Order'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })()}
+        </div>
+      </div>
 
       {/* HRS-derived notice */}
       {derivedQuantityKeys.size > 0 && Object.keys(quantities).length > 0 && (
@@ -2025,7 +2195,46 @@ const LabTests = () => {
         const { totalSamples: cartSamples, totalCost: cartCost } = getCartTotals();
         const combinedSamples = totalSamples + cartSamples;
         const combinedLabCost = totalCost + cartCost;
-        const grandTotal = combinedLabCost + staffCost;
+
+        // PLM layer check — are any PLM - Bulk Building Materials tests in the order?
+        const PLM_KEYWORD = 'PLM';
+        let plmQty = 0;
+        let plmUnitPrice = 0;
+        // Check quantities from the standard map
+        const allCats = allCategoriesRef.current.length > 0 ? allCategoriesRef.current : categories;
+        Object.entries(quantities).forEach(([key, qty]) => {
+          if (qty <= 0) return;
+          const lastDash = key.lastIndexOf('-');
+          if (lastDash === -1) return;
+          const testName = key.substring(0, lastDash);
+          const turnTime = key.substring(lastDash + 1);
+          allCats.forEach(cat => {
+            if (!cat.name.toUpperCase().includes(PLM_KEYWORD)) return;
+            (cat.tests || []).forEach(t => {
+              if (t.name !== testName) return;
+              (t.rates || []).forEach(r => {
+                const rt = typeof r.turn_time === 'string' ? r.turn_time : r.turn_time?.label || '';
+                if (rt === turnTime) {
+                  plmQty += parseFloat(qty);
+                  if (!plmUnitPrice) plmUnitPrice = r.price || 0;
+                }
+              });
+            });
+          });
+        });
+        // Also check cart items
+        cart.forEach(item => {
+          if (!item.categoryName?.toUpperCase().includes(PLM_KEYWORD)) return;
+          plmQty += item.quantity || 0;
+          if (!plmUnitPrice) plmUnitPrice = item.price || 0;
+        });
+
+        const hasPLM = plmQty > 0;
+        const plmLayerSamples = hasPLM ? Math.ceil(plmQty * plmLayerMultiplier) : 0;
+        const plmLayerCost = plmLayerSamples * plmUnitPrice;
+        const subtotalCost = combinedLabCost + staffCost + plmLayerCost;
+        const markupAmount = subtotalCost * (labMarkupPercent / 100);
+        const grandTotal = subtotalCost + markupAmount;
 
         if (combinedSamples > 0 || combinedLabCost > 0 || staffCost > 0) {
           return (
@@ -2082,41 +2291,85 @@ const LabTests = () => {
                     </div>
                   )}
 
-                  {/* Totals */}
+                  {/* Totals Section */}
                   <div className="order-summary-totals">
                     <div className="order-summary-item">
                       <span className="order-summary-label">Total Samples:</span>
-                      <span className="order-summary-value">
-                        {combinedSamples.toLocaleString('en-US')}
-                      </span>
+                      <span className="order-summary-value">{combinedSamples.toLocaleString('en-US')}</span>
                     </div>
                     <div className="order-summary-item">
                       <span className="order-summary-label">Lab Fees Cost:</span>
                       <span className="order-summary-value">
-                        ${combinedLabCost.toLocaleString('en-US', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2
-                        })}
+                        ${combinedLabCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
                     {staffCost > 0 && (
                       <div className="order-summary-item">
                         <span className="order-summary-label">Field Collection Labor Cost:</span>
                         <span className="order-summary-value">
-                          ${staffCost.toLocaleString('en-US', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2
-                          })}
+                          ${staffCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       </div>
                     )}
-                    <div className="order-summary-item highlight">
-                      <span className="order-summary-label">Grand Total:</span>
+
+                    {/* PLM Layer Multiplier Section */}
+                    {hasPLM && (
+                      <>
+                        <div style={{ marginTop: '16px', padding: '12px', background: '#fffde7', borderRadius: '8px', border: '1px solid #f9e000' }}>
+                          <div style={{ fontWeight: 600, marginBottom: '10px', color: '#7b6e00' }}>PLM – Bulk Building Materials Layer Fees</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                            <span style={{ color: '#7b6e00', fontSize: '0.9rem' }}>Layer Multiplier:</span>
+                            <input
+                              type="number"
+                              step="0.001"
+                              min="0"
+                              value={plmLayerMultiplier}
+                              onChange={e => setPlmLayerMultiplier(parseFloat(e.target.value) || 0)}
+                              style={{ width: '90px', padding: '6px 8px', border: '2px solid #f0d000', borderRadius: '6px', fontWeight: 600, textAlign: 'center' }}
+                            />
+                          </div>
+                          <div style={{ fontSize: '0.88rem', color: '#7b6e00' }}>
+                            Layer Samples: {plmQty} × {plmLayerMultiplier} = <strong>{plmLayerSamples}</strong> (rounded up)
+                          </div>
+                          <div style={{ marginTop: '6px', fontWeight: 600, color: '#5a5000' }}>
+                            PLM Layer Cost: {plmLayerSamples} × ${plmUnitPrice.toFixed(2)} = <strong>${plmLayerCost.toFixed(2)}</strong>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Subtotal */}
+                    <div className="order-summary-item" style={{ marginTop: '12px', borderTop: '1px solid #e0e0e0', paddingTop: '10px' }}>
+                      <span className="order-summary-label">Subtotal Cost:</span>
+                      <span className="order-summary-value">
+                        ${subtotalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                    {/* Lab Markup */}
+                    <div style={{ marginTop: '10px', padding: '12px', background: '#e8f5e9', borderRadius: '8px', border: '1px solid #a5d6a7' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        <span style={{ color: '#2e7d32', fontWeight: 600 }}>Lab Markup:</span>
+                        <input
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          value={labMarkupPercent}
+                          onChange={e => setLabMarkupPercent(parseFloat(e.target.value) || 0)}
+                          style={{ width: '70px', padding: '6px 8px', border: '2px solid #a5d6a7', borderRadius: '6px', fontWeight: 600, textAlign: 'center' }}
+                        />
+                        <span style={{ color: '#2e7d32' }}>%</span>
+                        <span style={{ marginLeft: 'auto', color: '#2e7d32', fontWeight: 700 }}>
+                          + ${markupAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Grand Total */}
+                    <div className="order-summary-item highlight" style={{ marginTop: '10px' }}>
+                      <span className="order-summary-label">Total Cost:</span>
                       <span className="order-summary-value order-summary-total">
-                        ${grandTotal.toLocaleString('en-US', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2
-                        })}
+                        ${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
                   </div>

@@ -8,6 +8,7 @@ import Login from './components/Login';
 import Home from './components/Home';
 import SelectProject from './components/SelectProject';
 import LabTests from './components/LabTests';
+import Equipment from './components/Equipment';
 import HRSEstimator from './components/HRSEstimator';
 import EstimationsList from './components/EstimationsList';
 import Logistics from './components/Logistics';
@@ -41,6 +42,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <LabTests />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/equipment"
+                element={
+                  <ProtectedRoute>
+                    <Equipment />
                   </ProtectedRoute>
                 }
               />

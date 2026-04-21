@@ -19,6 +19,7 @@ const ProjectEstimateSummary = () => {
   const [expandedModules, setExpandedModules] = useState({
     hrs_estimator: false,
     lab: false,
+    equipment: false,
     logistics: false
   });
 
@@ -39,7 +40,8 @@ const ProjectEstimateSummary = () => {
           const labs = await labFeesAPI.getLabs();
           const allCategories = [];
           for (const lab of labs) {
-            const labCategories = await labFeesAPI.getCategoriesForLab(lab.id);
+            const result = await labFeesAPI.getLabFees(lab.id);
+            const labCategories = result.categories || [];
             // Tag each category with its lab name for attribution
             labCategories.forEach(cat => {
               cat.labName = lab.name;
@@ -97,6 +99,7 @@ const ProjectEstimateSummary = () => {
     const names = {
       'hrs_estimator': 'HRS Estimator',
       'lab': 'Lab Fees',
+      'equipment': 'Equipment',
       'logistics': 'Logistics'
     };
     return names[moduleName] || moduleName;
@@ -242,6 +245,18 @@ const ProjectEstimateSummary = () => {
                     />
                   </div>
                 )}
+              </div>
+
+              {/* Equipment Module (placeholder) */}
+              <div className="module-item-expandable">
+                <div className="module-item-header" style={{ cursor: 'default' }}>
+                  <div className="module-name">{getModuleDisplayName('equipment')}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    <div className="module-value not-generated" style={{ color: '#9e9e9e', fontStyle: 'italic', fontSize: '0.9rem' }}>
+                      Coming Soon
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Logistics Module */}

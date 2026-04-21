@@ -722,6 +722,29 @@ export const userManagementAPI = {
   },
 };
 
+// Lab Settings API (admin-configurable lab defaults)
+export const labSettingsAPI = {
+  getSettings: async () => {
+    try {
+      const response = await api.get('/lab-fees/settings');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching lab settings:', error);
+      return { lab_markup_default: '50' };
+    }
+  },
+
+  updateSettings: async (updates) => {
+    try {
+      const response = await api.put('/lab-fees/settings', updates);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating lab settings:', error);
+      throw error;
+    }
+  },
+};
+
 // Authentication API
 export const authAPI = {
   // Sign in
