@@ -629,26 +629,27 @@ const LabTests = () => {
       console.log('Fetching categories for lab:', labId);
       const categoriesData = await labFeesAPI.getCategories(labId);
 
+      // Bulk fetch ALL rates for this lab up front to prevent DB connection exhaustion
+      const allLabRates = await labFeesAPI.getRatesByLab(labId);
+
       // Fetch tests for each category
       const categoriesWithTests = await Promise.all(
         categoriesData.map(async (category) => {
           const tests = await labFeesAPI.getTests(category.id);
 
-          // Fetch rates for each test
-          const testsWithRates = await Promise.all(
-            tests.map(async (test) => {
-              const rates = await labFeesAPI.getRates(test.id);
-              return {
-                ...test,
-                rates: rates.map(rate => ({
-                  ...rate,
-                  turn_time: rate.turn_time.label,
-                  hours: rate.turn_time.hours,
-                  sample_count: null // Never use sample_count from API - quantities come from HRS outputs only
-                }))
-              };
-            })
-          );
+          // Assign rates from the bulk fetched list instead of making per-test api calls
+          const testsWithRates = tests.map(test => {
+            const testRates = allLabRates.filter(r => r.test_id === test.id);
+            return {
+              ...test,
+              rates: testRates.map(rate => ({
+                ...rate,
+                turn_time: typeof rate.turn_time === 'string' ? rate.turn_time : rate.turn_time?.label || '',
+                hours: rate.turn_time?.hours || 0,
+                sample_count: null // Never use sample_count from API - quantities come from HRS outputs only
+              }))
+            };
+          });
 
           return {
             ...category,
@@ -1126,23 +1127,25 @@ const LabTests = () => {
 
         try {
           const categoriesData = await labFeesAPI.getCategories(selectedLab.id);
+          const allLabRates = await labFeesAPI.getRatesByLab(selectedLab.id);
+
           const categoriesWithTests = await Promise.all(
             categoriesData.map(async (category) => {
               const tests = await labFeesAPI.getTests(category.id);
-              const testsWithRates = await Promise.all(
-                tests.map(async (test) => {
-                  const rates = await labFeesAPI.getRates(test.id);
-                  return {
-                    ...test,
-                    rates: rates.map(rate => ({
-                      ...rate,
-                      turn_time: rate.turn_time.label,
-                      hours: rate.turn_time.hours,
-                      sample_count: null
-                    }))
-                  };
-                })
-              );
+              
+              const testsWithRates = tests.map(test => {
+                const testRates = allLabRates.filter(r => r.test_id === test.id);
+                return {
+                  ...test,
+                  rates: testRates.map(rate => ({
+                    ...rate,
+                    turn_time: typeof rate.turn_time === 'string' ? rate.turn_time : rate.turn_time?.label || '',
+                    hours: rate.turn_time?.hours || 0,
+                    sample_count: null
+                  }))
+                };
+              });
+
               return { ...category, tests: testsWithRates };
             })
           );

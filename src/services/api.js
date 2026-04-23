@@ -84,6 +84,21 @@ export const labFeesAPI = {
     }
   },
 
+  // Bulk fetch all rates for an entire lab to prevent DB connection exhaustion
+  getRatesByLab: async (labId) => {
+    try {
+      const response = await api.get(`/lab-fees/rates/by_lab/${labId}`);
+      return response.data;
+    } catch (error) {
+      // If none found, returning empty is safe
+      if (error.response && error.response.status === 404) {
+         return [];
+      }
+      console.error('Error fetching rates for lab:', error);
+      throw error;
+    }
+  },
+
   // Get all lab fees data (categories, tests, rates) for a specific lab
   getLabFees: async (labId) => {
     try {
