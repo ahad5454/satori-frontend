@@ -306,6 +306,12 @@ const PreviousEstimates = () => {
                               {formatCurrency(snapshot.logistics_total)}
                             </span>
                           </div>
+                          <div className="module-total">
+                            <span className="module-label">Equipment:</span>
+                            <span className="module-value">
+                              {formatCurrency(snapshot.equipment_total)}
+                            </span>
+                          </div>
                           <div className="grand-total">
                             <span className="total-label">Grand Total:</span>
                             <span className="total-value">
