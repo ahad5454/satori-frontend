@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { userManagementAPI, labSettingsAPI } from '../services/api';
+import AdminEquipment from './AdminEquipment';
 import './AdminDashboard.css';
 
 const AdminDashboard = () => {
@@ -271,6 +272,12 @@ const AdminDashboard = () => {
                     onClick={() => setActiveTab('lab_settings')}
                 >
                     🔬 Lab Settings
+                </button>
+                <button
+                    className={`admin-tab ${activeTab === 'equipment' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('equipment')}
+                >
+                    🛠️ Consumables & Equipment
                 </button>
             </div>
 
@@ -701,6 +708,11 @@ const AdminDashboard = () => {
                         </div>
                     )}
                 </div>
+            )}
+
+            {/* Consumables & Equipment Tab */}
+            {activeTab === 'equipment' && (
+                <AdminEquipment />
             )}
         </div>
     );

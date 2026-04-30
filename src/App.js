@@ -8,7 +8,7 @@ import Login from './components/Login';
 import Home from './components/Home';
 import SelectProject from './components/SelectProject';
 import LabTests from './components/LabTests';
-import Equipment from './components/Equipment';
+import EquipmentConsumables from './components/EquipmentConsumables';
 import HRSEstimator from './components/HRSEstimator';
 import EstimationsList from './components/EstimationsList';
 import Logistics from './components/Logistics';
@@ -49,7 +49,7 @@ function App() {
                 path="/equipment"
                 element={
                   <ProtectedRoute>
-                    <Equipment />
+                    <EquipmentConsumables />
                   </ProtectedRoute>
                 }
               />

@@ -792,4 +792,90 @@ export const authAPI = {
   }
 };
 
+// Equipment & Consumables API
+export const equipmentConsumablesAPI = {
+  getCategories: async () => {
+    try {
+      const response = await api.get('/equipment/categories/');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      throw error;
+    }
+  },
+  createCategory: async (data) => {
+    try {
+      const response = await api.post('/equipment/categories/', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating category:', error);
+      throw error;
+    }
+  },
+  updateCategory: async (id, data) => {
+    try {
+      const response = await api.put(`/equipment/categories/${id}`, data);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating category:', error);
+      throw error;
+    }
+  },
+  deleteCategory: async (id) => {
+    try {
+      const response = await api.delete(`/equipment/categories/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      throw error;
+    }
+  },
+  getItems: async (categoryId = null) => {
+    try {
+      const url = categoryId ? `/equipment/items/?category_id=${categoryId}` : '/equipment/items/';
+      const response = await api.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching items:', error);
+      throw error;
+    }
+  },
+  createItem: async (data) => {
+    try {
+      const response = await api.post('/equipment/items/', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating item:', error);
+      throw error;
+    }
+  },
+  updateItem: async (id, data) => {
+    try {
+      const response = await api.put(`/equipment/items/${id}`, data);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating item:', error);
+      throw error;
+    }
+  },
+  deleteItem: async (id) => {
+    try {
+      const response = await api.delete(`/equipment/items/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting item:', error);
+      throw error;
+    }
+  },
+  createOrder: async (data) => {
+    try {
+      const response = await api.post('/equipment/orders/', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating equipment order:', error);
+      throw error;
+    }
+  },
+};
+
 export default api;

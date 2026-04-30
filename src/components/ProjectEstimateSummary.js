@@ -6,6 +6,7 @@ import ProjectHeader from './ProjectHeader';
 import HRSBreakdownDetails from './HRSBreakdownDetails';
 import LabFeesBreakdownDetails from './LabFeesBreakdownDetails';
 import LogisticsBreakdownDetails from './LogisticsBreakdownDetails';
+import EquipmentBreakdownDetails from './EquipmentBreakdownDetails';
 import './ProjectEstimateSummary.css';
 
 const ProjectEstimateSummary = () => {
@@ -247,16 +248,32 @@ const ProjectEstimateSummary = () => {
                 )}
               </div>
 
-              {/* Equipment Module (placeholder) */}
+              {/* Equipment Module */}
               <div className="module-item-expandable">
-                <div className="module-item-header" style={{ cursor: 'default' }}>
+                <div
+                  className="module-item-header"
+                  onClick={() => summary.modules.equipment !== null && toggleModule('equipment')}
+                  style={{ cursor: summary.modules.equipment !== null ? 'pointer' : 'default' }}
+                >
                   <div className="module-name">{getModuleDisplayName('equipment')}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                    <div className="module-value not-generated" style={{ color: '#9e9e9e', fontStyle: 'italic', fontSize: '0.9rem' }}>
-                      Coming Soon
+                    <div className={`module-value ${summary.modules.equipment === null ? 'not-generated' : ''}`}>
+                      {formatCurrency(summary.modules.equipment)}
                     </div>
+                    {summary.modules.equipment !== null && (
+                      <span className="toggle-icon" style={{ fontSize: '1.2rem' }}>
+                        {expandedModules.equipment ? '▼' : '▶'}
+                      </span>
+                    )}
                   </div>
                 </div>
+                {expandedModules.equipment && snapshot?.equipment_data && (
+                  <div className="module-breakdown-content">
+                    <EquipmentBreakdownDetails
+                      details={snapshot.equipment_data.outputs || {}}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Logistics Module */}
