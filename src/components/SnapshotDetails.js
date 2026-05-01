@@ -148,11 +148,16 @@ const SnapshotDetails = () => {
   const logisticsInputs = logisticsData.inputs || {};
   const logisticsOutputs = logisticsData.outputs || {};
 
+  const equipmentData = snapshot.equipment_data || {};
+  const equipmentInputs = equipmentData.inputs || {};
+  const equipmentOutputs = equipmentData.outputs || {};
+
   // Calculate totals
   const hrsTotal = hrsOutputs.total_cost || 0;
   const labTotal = labOutputs.total_cost || 0;
   const logisticsTotal = logisticsOutputs.total_logistics_cost || 0;
-  const grandTotal = hrsTotal + labTotal + logisticsTotal;
+  const equipmentTotal = equipmentOutputs.total_cost || 0;
+  const grandTotal = hrsTotal + labTotal + logisticsTotal + equipmentTotal;
 
   return (
     <div className="snapshot-details-container">
@@ -836,6 +841,77 @@ const SnapshotDetails = () => {
         ) : (
           <div className="module-section">
             <h2 className="module-title">Logistics</h2>
+            <div className="no-data">Not used in this estimate</div>
+          </div>
+        )}
+
+        {/* Equipment & Consumables Section */}
+        {equipmentData.inputs || equipmentData.outputs ? (
+          <div className="module-section">
+            <h2 className="module-title">Equipment & Consumables</h2>
+            {equipmentData.inputs ? (
+              <div className="module-inputs">
+                <h3>Inputs</h3>
+                {equipmentInputs.order_details && Object.keys(equipmentInputs.order_details).length > 0 && (
+                  <div className="data-table-section">
+                    <h4>Order Details</h4>
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Category ID</th>
+                          <th>Items</th>
+                          <th>Is Flat Rate?</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(equipmentInputs.order_details).map(([catId, catData]) => (
+                          <tr key={catId}>
+                            <td>{catId}</td>
+                            <td>
+                              {catData.items && Object.keys(catData.items).length > 0 ? Object.entries(catData.items).map(([itemId, qty]) => (
+                                <div key={itemId}>Item #{itemId}: {qty}</div>
+                              )) : <span>-</span>}
+                            </td>
+                            <td>{catData.is_flat_rate ? 'Yes' : 'No'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="no-data">No Equipment inputs saved</div>
+            )}
+            {equipmentData.outputs ? (
+              <div className="module-outputs">
+                <h3>Calculated Outputs</h3>
+                <div className="outputs-grid">
+                  {equipmentOutputs.section_1_total !== undefined && (
+                    <div className="output-item">
+                      <span className="output-label">Section 1 Total:</span>
+                      <span className="output-value">{formatCurrency(equipmentOutputs.section_1_total)}</span>
+                    </div>
+                  )}
+                  {equipmentOutputs.section_2_total !== undefined && (
+                    <div className="output-item">
+                      <span className="output-label">Section 2 Total:</span>
+                      <span className="output-value">{formatCurrency(equipmentOutputs.section_2_total)}</span>
+                    </div>
+                  )}
+                  <div className="output-total">
+                    <span className="total-label">Equipment Total:</span>
+                    <span className="total-value">{formatCurrency(equipmentTotal)}</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="no-data">No Equipment outputs calculated</div>
+            )}
+          </div>
+        ) : (
+          <div className="module-section">
+            <h2 className="module-title">Equipment & Consumables</h2>
             <div className="no-data">Not used in this estimate</div>
           </div>
         )}
