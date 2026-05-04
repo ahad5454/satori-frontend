@@ -102,6 +102,19 @@ const Home = () => {
               </button>
 
               <button
+                onClick={() => handleModuleClick('/equipment')}
+                className="module-card"
+              >
+                <div className="module-icon-container equipment-theme">
+                  <span className="module-initial">E</span>
+                </div>
+                <div className="module-content">
+                  <h3>Equipment</h3>
+                  <p>Consumables & equipment</p>
+                </div>
+              </button>
+
+              <button
                 onClick={() => navigate('/previous-estimates')}
                 className="module-card history-theme"
               >
@@ -231,6 +244,12 @@ const Home = () => {
               className="cta-button primary"
             >
               Logistics Estimator
+            </button>
+            <button
+              onClick={() => handleModuleClick('/equipment')}
+              className="cta-button primary"
+            >
+              Equipment & Consumables
             </button>
             <button
               onClick={() => navigate('/previous-estimates')}
