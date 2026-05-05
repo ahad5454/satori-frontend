@@ -9,6 +9,24 @@ const api = axios.create({
   },
 });
 
+// Add a response interceptor to handle 401 errors globally
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // If we get a 401 Unauthorized and we're not trying to login, log the user out
+    if (error.response && error.response.status === 401) {
+      if (error.config && !error.config.url.includes('/auth/signin')) {
+        console.warn('Token expired or invalid. Logging out.');
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('user_role');
+        localStorage.removeItem('user_email');
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const labFeesAPI = {
   // Get all laboratories
   getLabs: async () => {
