@@ -480,7 +480,15 @@ const Logistics = () => {
       setEstimationResult(result);
     } catch (err) {
       console.error('Error creating estimation:', err);
-      setError(`Failed to generate estimation: ${err.response?.data?.detail || err.message}`);
+      let errorMsg = err.message;
+      if (err.response?.data?.detail) {
+        if (Array.isArray(err.response.data.detail)) {
+          errorMsg = err.response.data.detail.map(e => `${e.loc?.slice(1).join('.')} - ${e.msg}`).join(', ');
+        } else {
+          errorMsg = String(err.response.data.detail);
+        }
+      }
+      setError(`Failed to generate estimation: ${errorMsg}`);
     } finally {
       setLoading(false);
     }

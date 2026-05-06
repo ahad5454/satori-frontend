@@ -55,6 +55,7 @@ const AdminDashboard = () => {
         fetchLaborRates();
         fetchLogisticsSettings();
         fetchLabSettingsData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [userRole, navigate]);
 
     const fetchUsers = async () => {

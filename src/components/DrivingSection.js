@@ -71,13 +71,7 @@ const DrivingSection = ({
     return '0.00';
   };
 
-  // Pre-fill site location from roundtrip project location
-  useEffect(() => {
-    if (roundtripData?.project_location && !dailyData?.site_location && locationType === 'other') {
-      setDailyData(prev => ({ ...prev, site_location: roundtripData.project_location }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roundtripData?.project_location, locationType]);
+
 
   // If roundtripData is null/undefined, don't show roundtrip section
   const showRoundtrip = siteAccessMode === 'driving' && roundtripData;

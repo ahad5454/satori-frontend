@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+
 import { useProject } from '../contexts/ProjectContext';
 import { projectSummaryAPI, estimateSnapshotAPI, labFeesAPI } from '../services/api';
 import ProjectHeader from './ProjectHeader';
@@ -10,7 +10,6 @@ import EquipmentBreakdownDetails from './EquipmentBreakdownDetails';
 import './ProjectEstimateSummary.css';
 
 const ProjectEstimateSummary = () => {
-  const navigate = useNavigate();
   const { project, handleProjectNotFound } = useProject();
   const [summary, setSummary] = useState(null);
   const [snapshot, setSnapshot] = useState(null);

@@ -114,6 +114,7 @@ const PreviousEstimates = () => {
     navigate(`/snapshots/${snapshotId}/details`);
   };
 
+  /*
   const handleDeleteSnapshot = async (snapshotId) => {
     const confirmed = window.confirm(
       'This will permanently delete this estimate. This action cannot be undone.\n\nAre you sure you want to delete this estimate?'
@@ -130,6 +131,7 @@ const PreviousEstimates = () => {
       alert('Failed to delete estimate. Please try again.');
     }
   };
+  */
 
   const handleDeleteProject = async (projectId, projectName) => {
     if (!projectId) {
@@ -202,8 +204,6 @@ const PreviousEstimates = () => {
       </div>
     );
   }
-
-  const totalSnapshots = filteredProjects.reduce((sum, project) => sum + project.snapshots.length, 0);
 
   return (
     <div className="previous-estimates-container">
