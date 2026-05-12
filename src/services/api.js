@@ -894,6 +894,15 @@ export const equipmentConsumablesAPI = {
       throw error;
     }
   },
+  seedData: async () => {
+    try {
+      const response = await api.get('/equipment/seed');
+      return response.data;
+    } catch (error) {
+      console.error('Error seeding equipment data:', error);
+      throw error;
+    }
+  },
 };
 
 export default api;

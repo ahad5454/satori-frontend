@@ -124,6 +124,17 @@ const AdminEquipment = () => {
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <button className="add-user-btn" onClick={() => openCategoryModal()}>+ Add Category</button>
                     <button className="add-user-btn" onClick={() => openItemModal()} style={{ backgroundColor: '#3498db' }}>+ Add Item</button>
+                    <button className="add-user-btn" onClick={async () => {
+                        if(window.confirm('Are you sure? This will wipe existing items and seed defaults.')) {
+                            try {
+                                await equipmentConsumablesAPI.seedData();
+                                alert('Database seeded successfully!');
+                                fetchData();
+                            } catch(e) {
+                                alert('Failed to seed: ' + (e.response?.data?.detail || e.message));
+                            }
+                        }
+                    }} style={{ backgroundColor: '#e74c3c' }}>Seed Defaults</button>
                 </div>
             </div>
 
