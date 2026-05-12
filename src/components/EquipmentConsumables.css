@@ -255,3 +255,34 @@
   border-left: 4px solid #ef4444;
   margin-top: 20px;
 }
+
+.collapsible-header {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease;
+}
+
+.collapsible-header:hover {
+  background-color: #f1f5f9;
+}
+
+.equipment-section > .collapsible-header {
+  padding: 10px;
+  border-radius: 8px;
+  margin-left: -10px;
+  margin-right: -10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.toggle-icon {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin-left: 10px;
+}
+
+.category-header h3 {
+  display: flex;
+  align-items: center;
+}

@@ -23,6 +23,18 @@ const EquipmentConsumables = () => {
     // flatRates: { categoryId: boolean }
     const [flatRates, setFlatRates] = useState({});
 
+    // Collapse states
+    const [expandedSections, setExpandedSections] = useState({ 1: true, 2: true });
+    const [expandedCategories, setExpandedCategories] = useState({});
+
+    const toggleSection = (sectionId) => {
+        setExpandedSections(prev => ({ ...prev, [sectionId]: !prev[sectionId] }));
+    };
+
+    const toggleCategory = (categoryId) => {
+        setExpandedCategories(prev => ({ ...prev, [categoryId]: prev[categoryId] === false ? true : false }));
+    };
+
     // Fetch master data
     useEffect(() => {
         const fetchMasterData = async () => {
@@ -233,10 +245,15 @@ const EquipmentConsumables = () => {
             <form onSubmit={handleSubmit}>
                 {/* Section 1: Consumables & Materials */}
                 <div className="equipment-section">
-                    <h2>Section 1: Consumables & Materials</h2>
-                    <p style={{ color: '#64748b', marginBottom: '20px' }}>
-                        For each category, you can enter itemized quantities, OR select the "10% Flat Rate" option for a quick block estimate.
-                    </p>
+                    <h2 onClick={() => toggleSection(1)} className="collapsible-header">
+                        Section 1: Consumables & Materials
+                        <span className="toggle-icon">{expandedSections[1] ? '▼' : '▶'}</span>
+                    </h2>
+                    {expandedSections[1] && (
+                        <>
+                            <p style={{ color: '#64748b', marginBottom: '20px' }}>
+                                For each category, you can enter itemized quantities, OR select the "10% Flat Rate" option for a quick block estimate.
+                            </p>
                     
                     {categories.filter(c => c.section === 1).map(category => {
                         const isFlatRate = flatRates[category.id] || false;
@@ -246,8 +263,15 @@ const EquipmentConsumables = () => {
                         
                         return (
                             <div key={category.id} className="equipment-category">
-                                <div className="category-header">
-                                    <h3>{category.name}</h3>
+                                <div className="category-header collapsible-header" onClick={(e) => {
+                                    if(e.target.tagName.toLowerCase() !== 'input' && e.target.tagName.toLowerCase() !== 'label') {
+                                        toggleCategory(category.id);
+                                    }
+                                }}>
+                                    <h3>
+                                        {category.name}
+                                        <span className="toggle-icon">{expandedCategories[category.id] !== false ? '▼' : '▶'}</span>
+                                    </h3>
                                     <div className="flat-rate-toggle">
                                         <input 
                                             type="checkbox" 
@@ -258,6 +282,9 @@ const EquipmentConsumables = () => {
                                         <label htmlFor={`flat-rate-${category.id}`}>Use 10% Flat Rate</label>
                                     </div>
                                 </div>
+                                
+                                {expandedCategories[category.id] !== false && (
+                                    <>
                                 
                                 {isFlatRate && (
                                     <div className="flat-rate-active-notice">
@@ -310,25 +337,34 @@ const EquipmentConsumables = () => {
                                     </tbody>
                                 </table>
                                 
-                                <div className="category-summary">
-                                    <span className="category-total-label">Category Subtotal:</span>
-                                    <span className="category-total-value">${categoryTotal.toFixed(2)}</span>
-                                </div>
+                                        <div className="category-summary">
+                                            <span className="category-total-label">Category Subtotal:</span>
+                                            <span className="category-total-value">${categoryTotal.toFixed(2)}</span>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         );
                     })}
                     
-                    <div style={{ textAlign: 'right', fontSize: '1.3rem', fontWeight: 'bold', color: '#2c3e50', marginTop: '20px' }}>
-                        Section 1 Total: <span style={{ color: '#3498db' }}>${section1Total.toFixed(2)}</span>
-                    </div>
+                            <div style={{ textAlign: 'right', fontSize: '1.3rem', fontWeight: 'bold', color: '#2c3e50', marginTop: '20px' }}>
+                                Section 1 Total: <span style={{ color: '#3498db' }}>${section1Total.toFixed(2)}</span>
+                            </div>
+                        </>
+                    )}
                 </div>
 
                 {/* Section 2: Equipment & Instrumentation */}
                 <div className="equipment-section">
-                    <h2>Section 2: Equipment & Instrumentation</h2>
-                    <p style={{ color: '#64748b', marginBottom: '20px' }}>
-                        Itemized entry only. Enter required quantities for instrumentation.
-                    </p>
+                    <h2 onClick={() => toggleSection(2)} className="collapsible-header">
+                        Section 2: Equipment & Instrumentation
+                        <span className="toggle-icon">{expandedSections[2] ? '▼' : '▶'}</span>
+                    </h2>
+                    {expandedSections[2] && (
+                        <>
+                            <p style={{ color: '#64748b', marginBottom: '20px' }}>
+                                Itemized entry only. Enter required quantities for instrumentation.
+                            </p>
                     
                     {categories.filter(c => c.section === 2).map(category => {
                         const categoryItems = items.filter(i => i.category_id === category.id);
@@ -336,9 +372,15 @@ const EquipmentConsumables = () => {
                         
                         return (
                             <div key={category.id} className="equipment-category">
-                                <div className="category-header">
-                                    <h3>{category.name}</h3>
+                                <div className="category-header collapsible-header" onClick={() => toggleCategory(category.id)}>
+                                    <h3>
+                                        {category.name}
+                                        <span className="toggle-icon">{expandedCategories[category.id] !== false ? '▼' : '▶'}</span>
+                                    </h3>
                                 </div>
+                                
+                                {expandedCategories[category.id] !== false && (
+                                    <>
                                 
                                 <table className="equipment-table">
                                     <thead>
@@ -383,17 +425,21 @@ const EquipmentConsumables = () => {
                                     </tbody>
                                 </table>
                                 
-                                <div className="category-summary">
-                                    <span className="category-total-label">Category Subtotal:</span>
-                                    <span className="category-total-value">${categoryTotal.toFixed(2)}</span>
-                                </div>
+                                        <div className="category-summary">
+                                            <span className="category-total-label">Category Subtotal:</span>
+                                            <span className="category-total-value">${categoryTotal.toFixed(2)}</span>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         );
                     })}
                     
-                    <div style={{ textAlign: 'right', fontSize: '1.3rem', fontWeight: 'bold', color: '#2c3e50', marginTop: '20px' }}>
-                        Section 2 Total: <span style={{ color: '#3498db' }}>${section2Total.toFixed(2)}</span>
-                    </div>
+                            <div style={{ textAlign: 'right', fontSize: '1.3rem', fontWeight: 'bold', color: '#2c3e50', marginTop: '20px' }}>
+                                Section 2 Total: <span style={{ color: '#3498db' }}>${section2Total.toFixed(2)}</span>
+                            </div>
+                        </>
+                    )}
                 </div>
 
                 {error && <div className="error-message">{error}</div>}
