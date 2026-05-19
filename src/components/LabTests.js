@@ -1005,6 +1005,40 @@ const LabTests = () => {
         }));
 
       const { totalCost } = getCartTotals();
+
+      // Compute PLM layer values to send to the backend (matches the display calculation)
+      const PLM_KEYWORD = 'PLM';
+      const allCatsForSave = allCategoriesRef.current.length > 0 ? allCategoriesRef.current : categories;
+      let plmQtyForSave = 0;
+      let plmUnitPriceForSave = 0;
+      Object.entries(quantities).forEach(([key, qty]) => {
+        if (qty <= 0) return;
+        const lastDash = key.lastIndexOf('-');
+        if (lastDash === -1) return;
+        const testName = key.substring(0, lastDash);
+        const turnTime = key.substring(lastDash + 1);
+        allCatsForSave.forEach(cat => {
+          if (!cat.name.toUpperCase().includes(PLM_KEYWORD)) return;
+          (cat.tests || []).forEach(t => {
+            if (t.name !== testName) return;
+            (t.rates || []).forEach(r => {
+              const rt = typeof r.turn_time === 'string' ? r.turn_time : r.turn_time?.label || '';
+              if (rt === turnTime) {
+                plmQtyForSave += parseFloat(qty);
+                if (!plmUnitPriceForSave) plmUnitPriceForSave = r.price || 0;
+              }
+            });
+          });
+        });
+      });
+      cart.forEach(item => {
+        if (!item.categoryName?.toUpperCase().includes(PLM_KEYWORD)) return;
+        plmQtyForSave += item.quantity || 0;
+        if (!plmUnitPriceForSave) plmUnitPriceForSave = item.price || 0;
+      });
+      const plmLayerSamplesForSave = plmQtyForSave > 0 ? Math.ceil(plmQtyForSave * plmLayerMultiplier) : 0;
+      const plmLayerCostForSave = plmLayerSamplesForSave * plmUnitPriceForSave;
+
       const orderData = {
         project_name: project?.name || null,
         hrs_estimation_id: hrsEstimationId,
@@ -1015,6 +1049,11 @@ const LabTests = () => {
         cart_items: cart, // Store full cart for rehydration
         plm_layer_multiplier: plmLayerMultiplier,
         lab_markup_percent: labMarkupPercent,
+        // PLM layer computed values (so backend includes them in total_cost)
+        plm_combined_qty: plmQtyForSave,
+        plm_layer_samples: plmLayerSamplesForSave,
+        plm_layer_cost: plmLayerCostForSave,
+        plm_unit_price: plmUnitPriceForSave,
       };
 
       const result = await labFeesAPI.createOrder(orderData);
@@ -1879,7 +1918,7 @@ const LabTests = () => {
           {/* Grand Total - Based on sample_count and/or cart */}
           {(() => {
             const { totalSamples, totalCost, breakdown } = calculateOrderSummary();
-            const { totalCost: staffCost, breakdown: staffBreakdown } = calculateStaffCosts();
+            const { totalCost: staffCost } = calculateStaffCosts();
             const { totalSamples: cartSamples, totalCost: cartCost } = getCartTotals();
             const combinedSamples = totalSamples + cartSamples;
             const combinedLabCost = totalCost + cartCost;

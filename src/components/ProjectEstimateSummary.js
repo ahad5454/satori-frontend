@@ -95,15 +95,6 @@ const ProjectEstimateSummary = () => {
     }).format(value);
   };
 
-  const getModuleDisplayName = (moduleName) => {
-    const names = {
-      'hrs_estimator': 'HRS Estimator',
-      'lab': 'Lab Fees',
-      'equipment': 'Equipment',
-      'logistics': 'Logistics'
-    };
-    return names[moduleName] || moduleName;
-  };
 
   if (loading) {
     return (
@@ -130,8 +121,6 @@ const ProjectEstimateSummary = () => {
   return (
     <div className="summary-container">
       <nav className="app-top-nav">
-        <a href="/" onClick={(e) => { e.preventDefault(); import('react-router-dom').then(m => window.location.href = '/'); /* Fallback usage if Link not imported */ }} className="nav-link" style={{ display: 'none' }}>Home</a>
-        {/* React Router Link would be better but I'll use the existing import linkage */}
         <button onClick={() => window.location.href = '/'} className="nav-action-btn">
           Home
         </button>
@@ -147,6 +136,7 @@ const ProjectEstimateSummary = () => {
       </nav>
 
       <ProjectHeader projectName={project?.name} moduleName="summary" />
+
       <div className="summary-content">
         <div className="summary-header">
           <p className="summary-subtitle">
@@ -155,7 +145,7 @@ const ProjectEstimateSummary = () => {
           </p>
         </div>
 
-        {/* Project Details Section */}
+        {/* Project Details */}
         {project && (
           <div className="project-details-card">
             <h2>Project Details</h2>
@@ -188,20 +178,21 @@ const ProjectEstimateSummary = () => {
             </div>
 
             <div className="modules-list">
-              {/* HRS Estimator Module */}
-              <div className="module-item-expandable">
+
+              {/* HRS Estimator */}
+              <div className="module-item-expandable" style={{ borderLeftColor: '#4a90e2' }}>
                 <div
                   className="module-item-header"
                   onClick={() => summary.modules.hrs_estimator !== null && toggleModule('hrs_estimator')}
                   style={{ cursor: summary.modules.hrs_estimator !== null ? 'pointer' : 'default' }}
                 >
-                  <div className="module-name">{getModuleDisplayName('hrs_estimator')}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                  <div className="module-name">HRS Sample Estimator</div>
+                  <div className="module-header-right">
                     <div className={`module-value ${summary.modules.hrs_estimator === null ? 'not-generated' : ''}`}>
                       {formatCurrency(summary.modules.hrs_estimator)}
                     </div>
                     {summary.modules.hrs_estimator !== null && (
-                      <span className="toggle-icon" style={{ fontSize: '1.2rem' }}>
+                      <span className="toggle-icon">
                         {expandedModules.hrs_estimator ? '▼' : '▶'}
                       </span>
                     )}
@@ -217,20 +208,20 @@ const ProjectEstimateSummary = () => {
                 )}
               </div>
 
-              {/* Lab Fees Module */}
-              <div className="module-item-expandable">
+              {/* Lab Fees */}
+              <div className="module-item-expandable" style={{ borderLeftColor: '#9b59b6' }}>
                 <div
                   className="module-item-header"
                   onClick={() => summary.modules.lab !== null && toggleModule('lab')}
                   style={{ cursor: summary.modules.lab !== null ? 'pointer' : 'default' }}
                 >
-                  <div className="module-name">{getModuleDisplayName('lab')}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                  <div className="module-name">Lab Fee Calculator</div>
+                  <div className="module-header-right">
                     <div className={`module-value ${summary.modules.lab === null ? 'not-generated' : ''}`}>
                       {formatCurrency(summary.modules.lab)}
                     </div>
                     {summary.modules.lab !== null && (
-                      <span className="toggle-icon" style={{ fontSize: '1.2rem' }}>
+                      <span className="toggle-icon" style={{ color: '#9b59b6' }}>
                         {expandedModules.lab ? '▼' : '▶'}
                       </span>
                     )}
@@ -247,20 +238,20 @@ const ProjectEstimateSummary = () => {
                 )}
               </div>
 
-              {/* Equipment Module */}
-              <div className="module-item-expandable">
+              {/* Equipment */}
+              <div className="module-item-expandable" style={{ borderLeftColor: '#e67e22' }}>
                 <div
                   className="module-item-header"
                   onClick={() => summary.modules.equipment !== null && toggleModule('equipment')}
                   style={{ cursor: summary.modules.equipment !== null ? 'pointer' : 'default' }}
                 >
-                  <div className="module-name">{getModuleDisplayName('equipment')}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                  <div className="module-name">Equipment</div>
+                  <div className="module-header-right">
                     <div className={`module-value ${summary.modules.equipment === null ? 'not-generated' : ''}`}>
                       {formatCurrency(summary.modules.equipment)}
                     </div>
                     {summary.modules.equipment !== null && (
-                      <span className="toggle-icon" style={{ fontSize: '1.2rem' }}>
+                      <span className="toggle-icon" style={{ color: '#e67e22' }}>
                         {expandedModules.equipment ? '▼' : '▶'}
                       </span>
                     )}
@@ -275,20 +266,20 @@ const ProjectEstimateSummary = () => {
                 )}
               </div>
 
-              {/* Logistics Module */}
-              <div className="module-item-expandable">
+              {/* Logistics */}
+              <div className="module-item-expandable" style={{ borderLeftColor: '#27ae60' }}>
                 <div
                   className="module-item-header"
                   onClick={() => summary.modules.logistics !== null && toggleModule('logistics')}
                   style={{ cursor: summary.modules.logistics !== null ? 'pointer' : 'default' }}
                 >
-                  <div className="module-name">{getModuleDisplayName('logistics')}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                  <div className="module-name">Logistics Estimator</div>
+                  <div className="module-header-right">
                     <div className={`module-value ${summary.modules.logistics === null ? 'not-generated' : ''}`}>
                       {formatCurrency(summary.modules.logistics)}
                     </div>
                     {summary.modules.logistics !== null && (
-                      <span className="toggle-icon" style={{ fontSize: '1.2rem' }}>
+                      <span className="toggle-icon" style={{ color: '#27ae60' }}>
                         {expandedModules.logistics ? '▼' : '▶'}
                       </span>
                     )}
@@ -302,8 +293,10 @@ const ProjectEstimateSummary = () => {
                   </div>
                 )}
               </div>
+
             </div>
 
+            {/* Grand Total Banner */}
             <div className="grand-total-section">
               <div className="grand-total-label">Grand Total</div>
               <div className="grand-total-value">
@@ -325,4 +318,3 @@ const ProjectEstimateSummary = () => {
 };
 
 export default ProjectEstimateSummary;
-
