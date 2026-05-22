@@ -1449,11 +1449,11 @@ const HRSEstimator = () => {
                       value={overridePercentages.bi || ''}
                       onChange={(e) => setOverridePercentages({ ...overridePercentages, bi: e.target.value })}
                       className="form-input"
-                      placeholder="Leave empty for 20%"
+                      placeholder="Leave empty for 35%"
                     />
                   </div>
                   <div className="input-group">
-                    <label>Override % - Technical Writing</label>
+                    <label>Override % - Technical Writing (multiplier)</label>
                     <input
                       type="number"
                       min="0"
@@ -1461,7 +1461,7 @@ const HRSEstimator = () => {
                       value={overridePercentages.tw || ''}
                       onChange={(e) => setOverridePercentages({ ...overridePercentages, tw: e.target.value })}
                       className="form-input"
-                      placeholder="Leave empty for 50%"
+                      placeholder="Leave empty for 50% (0.5×)"
                     />
                   </div>
                 </div>

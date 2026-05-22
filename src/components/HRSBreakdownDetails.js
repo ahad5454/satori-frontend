@@ -61,7 +61,7 @@ const HRSBreakdownDetails = ({ details, inputs }) => {
     if (inputs?.override_minutes_xrf && type === 'xrf') return inputs.override_minutes_xrf;
     if (inputs?.override_minutes_lead && type === 'lead') return inputs.override_minutes_lead;
     if (inputs?.override_minutes_mold && type === 'mold') return inputs.override_minutes_mold;
-    
+
     // Use defaults
     const defaults = { asbestos: 15.0, xrf: 3.0, lead: 10.0, mold: 20.0 };
     return defaults[type] || 0;
@@ -92,8 +92,19 @@ const HRSBreakdownDetails = ({ details, inputs }) => {
   const h_mold = calculateCategoryHours('mold', totalTapeLift + totalSporeTrap + totalCulturable);
 
   const fieldHours = h_asb + h_xrf + h_lead + h_mold;
-  const suggestedHoursBase = fieldHours + ormHours;
-  const suggestedHoursFinal = (fieldHours * efficiencyFactor) + ormHours;
+
+  const pctBI = details?.override_percentages?.bi ?? inputs?.override_percentage_bi ?? 35;
+  const twMultiplier = (details?.override_percentages?.tw ?? inputs?.override_percentage_tw ?? 50) / 100;
+
+  // BI = ROUNDUP(field_hours * bi_pct%, 0) — rounds up to whole number
+  const biHours = details.bi_hours ?? Math.ceil(fieldHours * (pctBI / 100));
+
+  // TW = ROUNDUP(field_hours + orm_hours + bi_hours, 1) * tw_multiplier
+  const twSum = fieldHours + ormHours + biHours;
+  const twHours = details.tw_hours ?? (Math.ceil(twSum * 10) / 10 * twMultiplier);
+
+  const suggestedHoursBase = details.suggested_hours_base ?? (fieldHours + biHours + twHours + ormHours);
+  const suggestedHoursFinal = details.suggested_hours_final ?? ((fieldHours * efficiencyFactor) + biHours + twHours + ormHours);
 
   // Get staff breakdown
   const getStaffBreakdown = () => {
@@ -220,6 +231,26 @@ const HRSBreakdownDetails = ({ details, inputs }) => {
                 fieldHours,
                 ' hours'
               )}
+              {biHours > 0 && (
+                <>
+                  {renderFormula(
+                    `Building Inspection = ROUNDUP(Field Hours × ${pctBI}%, 0)`,
+                    `ROUNDUP(${formatNumber(fieldHours)} × ${pctBI}%, 0)`,
+                    biHours,
+                    ' hours'
+                  )}
+                </>
+              )}
+              {twHours > 0 && (
+                <>
+                  {renderFormula(
+                    `Technical Writing = ROUNDUP(Field Hours + ORM + BI, 1) × ${twMultiplier}`,
+                    `ROUNDUP(${formatNumber(fieldHours)} + ${formatNumber(ormHours)} + ${formatNumber(biHours)}, 1) × ${twMultiplier}`,
+                    twHours,
+                    ' hours'
+                  )}
+                </>
+              )}
               {ormHours > 0 && (
                 <div className="data-item">
                   <span className="data-label">ORM Hours:</span>
@@ -227,16 +258,16 @@ const HRSBreakdownDetails = ({ details, inputs }) => {
                 </div>
               )}
               {renderFormula(
-                `Suggested Hours (Base) = Field Hours + ORM Hours`,
-                `${formatNumber(fieldHours)} + ${formatNumber(ormHours)}`,
+                `Suggested Hours (Base) = Field Hours + BI + TW + ORM Hours`,
+                `${formatNumber(fieldHours)} + ${formatNumber(biHours)} + ${formatNumber(twHours)} + ${formatNumber(ormHours)}`,
                 suggestedHoursBase,
                 ' hours'
               )}
               {efficiencyFactor !== 1.0 && (
                 <>
                   {renderFormula(
-                    `Suggested Hours (Final) = (Field Hours × Efficiency Factor) + ORM Hours`,
-                    `(${formatNumber(fieldHours)} × ${formatNumber(efficiencyFactor)}) + ${formatNumber(ormHours)}`,
+                    `Suggested Hours (Final) = (Field Hours × Efficiency Factor) + BI + TW + ORM Hours`,
+                    `(${formatNumber(fieldHours)} × ${formatNumber(efficiencyFactor)}) + ${formatNumber(biHours)} + ${formatNumber(twHours)} + ${formatNumber(ormHours)}`,
                     suggestedHoursFinal,
                     ' hours'
                   )}
