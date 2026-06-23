@@ -30,12 +30,7 @@ const HRSEstimator = () => {
 
   // Legacy: single role selection (for backward compatibility)
   const [selectedRole, setSelectedRole] = useState('');
-  const [manualLaborHours, setManualLaborHours] = useState({
-    'Program Manager': '',
-    'Project Manager': '',
-    'Accounting': '',
-    'Administrative': '',
-  });
+  const [manualLaborHours, setManualLaborHours] = useState({});
 
   // Section expand/collapse state
   const [expandedSections, setExpandedSections] = useState({
@@ -171,12 +166,10 @@ const HRSEstimator = () => {
 
         // Manual labor hours
         if (inputs.manual_labor_hours) {
-          const loadedManualHours = {
-            'Program Manager': inputs.manual_labor_hours['Program Manager']?.toString() || '',
-            'Project Manager': inputs.manual_labor_hours['Project Manager']?.toString() || '',
-            'Accounting': inputs.manual_labor_hours['Accounting']?.toString() || '',
-            'Administrative': inputs.manual_labor_hours['Administrative']?.toString() || '',
-          };
+          const loadedManualHours = {};
+          Object.entries(inputs.manual_labor_hours).forEach(([role, hours]) => {
+            loadedManualHours[role] = hours?.toString() || '';
+          });
           setManualLaborHours(loadedManualHours);
         }
 
@@ -1291,86 +1284,28 @@ const HRSEstimator = () => {
             {expandedSections.laborCategories && (
               <div className="section-content">
                 <div className="input-grid">
-                  <div className="input-group">
-                    <label>Program Manager Hours{canSeeRates ? ` ($${laborRates.find(r => r.labor_role === 'Program Manager')?.hourly_rate?.toFixed(2) || '131.55'}/hr)` : ''}</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={manualLaborHours['Program Manager']}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (value === '' || (!isNaN(parseFloat(value)) && parseFloat(value) >= 0)) {
-                          setManualLaborHours({
-                            ...manualLaborHours,
-                            'Program Manager': value
-                          });
-                        }
-                      }}
-                      className="form-input"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="input-group">
-                    <label>Project Manager Hours{canSeeRates ? ` ($${laborRates.find(r => r.labor_role === 'Project Manager')?.hourly_rate?.toFixed(2) || '104.23'}/hr)` : ''}</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={manualLaborHours['Project Manager']}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (value === '' || (!isNaN(parseFloat(value)) && parseFloat(value) >= 0)) {
-                          setManualLaborHours({
-                            ...manualLaborHours,
-                            'Project Manager': value
-                          });
-                        }
-                      }}
-                      className="form-input"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="input-group">
-                    <label>Accounting Hours{canSeeRates ? ` ($${laborRates.find(r => r.labor_role === 'Accounting')?.hourly_rate?.toFixed(2) || '95.36'}/hr)` : ''}</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={manualLaborHours['Accounting']}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (value === '' || (!isNaN(parseFloat(value)) && parseFloat(value) >= 0)) {
-                          setManualLaborHours({
-                            ...manualLaborHours,
-                            'Accounting': value
-                          });
-                        }
-                      }}
-                      className="form-input"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="input-group">
-                    <label>Administrative Hours{canSeeRates ? ` ($${laborRates.find(r => r.labor_role === 'Administrative')?.hourly_rate?.toFixed(2) || '54.80'}/hr)` : ''}</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={manualLaborHours['Administrative']}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (value === '' || (!isNaN(parseFloat(value)) && parseFloat(value) >= 0)) {
-                          setManualLaborHours({
-                            ...manualLaborHours,
-                            'Administrative': value
-                          });
-                        }
-                      }}
-                      className="form-input"
-                      placeholder="0"
-                    />
-                  </div>
+                  {laborRates.map((rate) => (
+                    <div className="input-group" key={rate.labor_role}>
+                      <label>{rate.labor_role} Hours{canSeeRates ? ` ($${rate.hourly_rate?.toFixed(2) || '0.00'}/hr)` : ''}</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={manualLaborHours[rate.labor_role] || ''}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '' || (!isNaN(parseFloat(value)) && parseFloat(value) >= 0)) {
+                            setManualLaborHours({
+                              ...manualLaborHours,
+                              [rate.labor_role]: value
+                            });
+                          }
+                        }}
+                        className="form-input"
+                        placeholder="0"
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
